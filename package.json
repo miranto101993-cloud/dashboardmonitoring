@@ -1,0 +1,9 @@
+{
+  "name": "dashboard-mitra10-yogyakarta",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Performance Dashboard Mitra10 Yogyakarta — website dengan data bersama (Netlify Functions + Blobs)",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

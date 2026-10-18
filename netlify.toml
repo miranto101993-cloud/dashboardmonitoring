@@ -1,6 +1,11 @@
-# Netlify — situs statis tanpa build
+# Netlify: situs statis (public/) + fungsi server (netlify/functions/api.mjs)
 [build]
-  publish = "."
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["netlify/data/**"]
 
 [[headers]]
   for = "/*"
@@ -9,4 +14,8 @@
     X-Frame-Options = "SAMEORIGIN"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "no-referrer"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
     Cache-Control = "no-cache"

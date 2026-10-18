@@ -1,40 +1,29 @@
-# Performance Dashboard — Mitra10 Yogyakarta
+# Performance Dashboard – Mitra10 Yogyakarta (versi Website + Server)
 
-Dashboard satu file (`index.html`), data sudah tertanam. Tidak ada build / server.
+Semua pengguna melihat data yang **sama**. Admin meng-upload data dari menu **Upload Data** → tersimpan di server (Netlify Blobs) → pengguna lain mendapat data terbaru (muncul banner "Muat ulang").
+Tampilan mobile ramah (menu drawer, filter bisa dilipat, tabel bisa digeser, bisa di-"Add to Home Screen").
 
-## Isi
-| File | Fungsi |
-|---|---|
-| `index.html` | Dashboard |
-| `netlify.toml`, `_headers` | Pengaturan Netlify (publish folder, header keamanan, noindex) |
-| `robots.txt` | Minta mesin pencari tidak mengindeks |
-| `.github/workflows/deploy-pages.yml` | Opsional: auto-deploy ke GitHub Pages |
-| `.nojekyll`, `.gitignore` | Pendukung GitHub |
+## Struktur
+- `public/` – halaman (index.html tanpa data; data dilayani server setelah login)
+- `netlify/functions/api.mjs` – backend (login, data bawaan, penyimpanan bersama)
+- `netlify/data/` – data bawaan (hanya dapat diunduh setelah login)
+- `netlify.toml`, `package.json`
 
-## A. Tayang di Netlify (netlify.app)
-**Cara cepat (tanpa GitHub):** app.netlify.com/drop → seret folder ini → selesai. Ubah nama situs di *Site configuration → Change site name* (mis. `dashboard-mitra10-yk.netlify.app`).
+## Cara pasang (GitHub → Netlify)
+1. Upload seluruh isi folder ini ke repository GitHub (**private** disarankan).
+2. Netlify → *Add new site → Import from Git* → pilih repo. Build command kosong, publish dir `public` (sudah di netlify.toml).
+3. Site configuration → *Environment variables*, isi:
+   - `ADMIN_PASSWORD` (wajib) – password admin (boleh upload data)
+   - `VIEW_PASSWORD` (disarankan) – password pengguna biasa (hanya lihat). Jika kosong, siapa pun yang tahu URL bisa melihat.
+   - `AUTH_SECRET` (opsional) – teks acak panjang untuk menandatangani sesi.
+4. Deploy ulang (Deploys → Trigger deploy).
 
-**Cara otomatis dari GitHub:** Netlify → *Add new site → Import an existing project → GitHub* → pilih repo → *Build command* kosong, *Publish directory* `.` → Deploy. Setiap push ke `main` otomatis tayang ulang.
+## Cara pakai
+- Buka website → masukkan password. Viewer: hanya melihat. Admin: menu *Upload Data* muncul (atau klik "Login Admin" di bawah menu kiri).
+- Admin upload file seperti biasa; data otomatis tersimpan di server untuk semua pengguna. "Reset ke Data Bawaan" mengembalikan ke data bawaan deploy.
+- Untuk mengganti data bawaan secara permanen, bangun ulang paket ini dari dashboard terbaru.
 
-## B. Simpan di GitHub
-```bash
-git init
-git add .
-git commit -m "Dashboard Mitra10 Yogyakarta"
-git branch -M main
-git remote add origin https://github.com/<username>/<nama-repo>.git
-git push -u origin main
-```
-Buat repository **Private** (data penjualan ada di dalam index.html). GitHub Pages dari repo private butuh akun berbayar; gunakan Netlify untuk tayang.
-
-## C. (Opsional) GitHub Pages
-Settings → Pages → Source: **GitHub Actions**. Workflow sudah tersedia. Alamat: `https://<username>.github.io/<nama-repo>/`.
-
-## Memperbarui data
-Ganti `index.html` dengan versi terbaru → commit & push (atau seret ulang folder ke Netlify Drop).
-
-## Keamanan — baca
-Semua data (penjualan, customer, budget) tertanam di `index.html`; siapa pun yang tahu link bisa membacanya, walau tidak terindeks Google.
-- Netlify: gunakan **Site protection → Password** (fitur paket berbayar) atau Cloudflare Access / Google Workspace.
-- Jangan simpan di repo Public.
-- PIN pada tab Belting hanya mengunci tampilan, bukan pengamanan.
+## Catatan
+- Data penuh ±36 MB (terkompres ±9 MB di server) – masuk kuota gratis Netlify Blobs, namun perhatikan batas fungsi/bandwidth paket Netlify Anda.
+- Password salah ditunda ±1 detik; sesi admin 12 jam, viewer 30 hari.
+- Paket ini diuji lokal (server Node + penyimpanan tiruan), belum di Netlify sungguhan.
