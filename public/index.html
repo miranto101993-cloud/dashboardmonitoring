@@ -387,7 +387,7 @@ body.role-viewer #nav-upload{ display:none !important; }
   function setTok(t){ try{ if(t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); }catch(e){} }
   async function api(path, opts){
     opts = opts || {}; var h = Object.assign({}, opts.headers || {}); var t = tok(); if(t) h.Authorization = 'Bearer ' + t;
-    var r = await fetch('/api/' + path, Object.assign({}, opts, {headers: h}));
+    var r = await fetch('/api/' + path, Object.assign({cache: /[?&]v=/.test(path) ? 'default' : 'no-store'}, opts, {headers: h}));
     if(r.status === 401 && path !== 'login'){ setTok(''); if(!window.__reloading401){ window.__reloading401 = true; location.reload(); } throw new Error('Sesi berakhir — silakan login ulang.'); }
     return r;
   }
@@ -498,9 +498,13 @@ body.role-viewer #nav-upload{ display:none !important; }
     var banner = null;
     function show(){ if(banner) return; banner = document.createElement('div'); banner.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:99990;background:#17262E;color:#fff;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:13.5px;';
       banner.innerHTML = '<span>Data dashboard sudah diperbarui.</span><button style="border:0;border-radius:8px;background:#D9720B;color:#241500;font-weight:800;padding:8px 14px;cursor:pointer;">Muat ulang</button>'; banner.querySelector('button').onclick = function(){ location.reload(); }; document.body.appendChild(banner); }
-    var known = window.__REV;
-    async function poll(){ if(document.hidden) return; try{ var r = await api('rev'); var j = await r.json(); if(j.rev && j.rev !== window.__REV) show(); }catch(e){} }
-    setInterval(poll, 60000); document.addEventListener('visibilitychange', function(){ if(!document.hidden) poll(); });
+    var reloading = false;
+    async function poll(){ if(document.hidden || reloading) return; try{ var r = await api('rev'); var j = await r.json(); if(j.rev && j.rev !== window.__REV){
+        if(ROLE === 'admin') show();
+        else { reloading = true; var t = document.createElement('div'); t.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:99990;background:#17262E;color:#fff;border-radius:12px;padding:12px 14px;font-size:13.5px;text-align:center;'; t.textContent = 'Data baru dari admin — memperbarui…'; document.body.appendChild(t); setTimeout(function(){ location.reload(); }, 1200); }
+      } }catch(e){} }
+    setInterval(poll, 20000); document.addEventListener('visibilitychange', poll); window.addEventListener('focus', poll); window.addEventListener('online', poll);
+    window.__siteCheck = async function(){ var r = await (await api('rev')).json(); var meta = null; try{ meta = JSON.parse(await gunz(await (await api('store/retailpulse_v2_meta')).text())); }catch(e){} return {revDiMuat: window.__REV, revServer: r.rev, tersimpanDiServer: meta ? meta.savedAt : null, bagian: meta ? meta.n : null, role: ROLE}; };
   }
 })();
 </script><div id="boot-loading" style="position:fixed;inset:0;background:#F4F1EA;display:flex;align-items:center;justify-content:center;z-index:99999;font:600 15px system-ui,sans-serif;color:#1F2A2E;">Memuat dashboard…</div>
