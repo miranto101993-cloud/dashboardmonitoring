@@ -1,5 +1,5 @@
 // Backend dashboard (Netlify Functions v2 + Netlify Blobs)
-// - Login: password Viewer (VIEW_PASSWORD, opsional) & Admin (ADMIN_PASSWORD, wajib untuk upload)
+// - Login per-user; admin utama bawaan + akun yang disetujui admin
 // - Data bawaan dashboard dilayani HANYA setelah login (tidak ada di file publik)
 // - Data hasil upload admin disimpan di server (Blobs) → semua pengguna mendapat data yang sama
 import { getStore } from '@netlify/blobs';
@@ -10,8 +10,10 @@ import { fileURLToPath } from 'node:url';
 
 const env = (k) => (process.env[k] || '').trim();
 const ADMIN_USER = () => (env('ADMIN_USER') || 'admin').toLowerCase();
+// Admin utama bawaan (password disimpan sebagai hash scrypt, bukan teks asli). Admin utama kedua (opsional) = ADMIN_USER + ADMIN_PASSWORD di Netlify.
+const OWNER_USER = 'miranto.101993@gmail.com', OWNER_SALT = 'm10-owner-salt-v1', OWNER_HASH = 'afEs4nD7ked15bvwR3spuacBvrOeJCWjljFC1RN11k4=';
 const ADMIN_PASSWORD = () => env('ADMIN_PASSWORD');
-const SECRET = () => env('AUTH_SECRET') || ('m10-' + ADMIN_PASSWORD() + '-' + ADMIN_USER());
+const SECRET = () => env('AUTH_SECRET') || ('m10-' + OWNER_HASH + '-' + ADMIN_PASSWORD() + '-' + ADMIN_USER());
 const store = () => getStore({ name: 'dashboard', consistency: 'strong' });
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
@@ -32,13 +34,17 @@ const text = (body, status = 200, extra = {}) => new Response(body, { status, he
 
 // ---------- akun pengguna (disimpan di Blobs: kunci "users") ----------
 // { users: { username: {name, role, salt, hash, pv, disabled, created} }, pending: { username: {name, salt, hash, requestedAt} } }
-const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
+const USERNAME_RE = /^[a-z0-9._@+-]{3,60}$/;
 const hashPw = (pw, salt) => scryptSync(String(pw), salt, 32).toString('base64');
 const newCred = (pw) => { const salt = randomBytes(16).toString('base64'); return { salt, hash: hashPw(pw, salt) }; };
 const checkPw = (pw, rec) => { try { const a = Buffer.from(hashPw(pw, rec.salt)), b = Buffer.from(rec.hash); return a.length === b.length && timingSafeEqual(a, b); } catch { return false; } };
 async function loadUsers() { try { const v = await store().get('users', { type: 'text' }); const o = v ? JSON.parse(v) : {}; return { users: o.users || {}, pending: o.pending || {} }; } catch { return { users: {}, pending: {} }; } }
 const saveUsers = (db) => store().set('users', JSON.stringify(db));
-const isOwner = (u) => u === ADMIN_USER();
+const isOwner = (u) => u === OWNER_USER || (!!ADMIN_PASSWORD() && u === ADMIN_USER());
+const ownerPwOk = (u, pw) => {
+  if (u === OWNER_USER) { try { const x = Buffer.from(hashPw(pw, OWNER_SALT)), y = Buffer.from(OWNER_HASH); if (x.length === y.length && timingSafeEqual(x, y)) return true; } catch {} }
+  return !!ADMIN_PASSWORD() && u === ADMIN_USER() && sameSecret(pw, ADMIN_PASSWORD());
+};
 const cleanName = (s) => String(s || '').replace(/[<>]/g, '').trim().slice(0, 60);
 
 // siapa yang memanggil? → {user, name, role} atau null. Dicek ke daftar pengguna di setiap permintaan, sehingga akses yang dihapus langsung mati.
@@ -46,7 +52,7 @@ async function who(req) {
   const h = req.headers.get('authorization') || '';
   const o = verify(h.startsWith('Bearer ') ? h.slice(7) : '');
   if (!o || !o.u) return null;
-  if (isOwner(o.u)) return ADMIN_PASSWORD() ? { user: o.u, name: 'Admin', role: 'admin' } : null;
+  if (isOwner(o.u)) return { user: o.u, name: 'Admin', role: 'admin' };
   const db = await loadUsers(); const r = db.users[o.u];
   if (!r || r.disabled || (o.pv || 0) !== (r.pv || 0)) return null;
   return { user: o.u, name: r.name || o.u, role: r.role === 'admin' ? 'admin' : 'viewer' };
@@ -73,12 +79,12 @@ export default async (req) => {
     if (path === 'login' && method === 'POST') {
       let b = {}; try { b = await req.json(); } catch {}
       const u = String(b.username || '').trim().toLowerCase(), pw = String(b.password || '');
-      if (!ADMIN_PASSWORD()) return json({ ok: false, error: 'Server belum dikonfigurasi: isi ADMIN_PASSWORD di Netlify (Site configuration → Environment variables).' }, 500);
+      const wantAdmin = b.as === 'admin';
       if (u && pw) {
-        if (isOwner(u)) { if (sameSecret(pw, ADMIN_PASSWORD())) return json({ ok: true, role: 'admin', name: 'Admin', token: sign({ u, exp: Date.now() + 12 * 3600e3 }) }); }
+        if (isOwner(u)) { if (ownerPwOk(u, pw)) return json({ ok: true, role: 'admin', name: 'Admin', token: sign({ u, exp: Date.now() + 12 * 3600e3 }) }); }
         else {
           const db = await loadUsers(); const r = db.users[u];
-          if (r && !r.disabled && checkPw(pw, r)) { const role = r.role === 'admin' ? 'admin' : 'viewer'; return json({ ok: true, role, name: r.name || u, token: sign({ u, pv: r.pv || 0, exp: Date.now() + (role === 'admin' ? 12 * 3600e3 : 7 * 24 * 3600e3) }) }); }
+          if (r && !r.disabled && checkPw(pw, r)) { const role = r.role === 'admin' ? 'admin' : 'viewer'; if (wantAdmin && role !== 'admin') { await sleep(600); return json({ ok: false, error: 'Akun ini bukan Admin. Pilih "Pengguna" untuk masuk.' }, 403); } return json({ ok: true, role, name: r.name || u, token: sign({ u, pv: r.pv || 0, exp: Date.now() + (role === 'admin' ? 12 * 3600e3 : 7 * 24 * 3600e3) }) }); }
           if (r && r.disabled) { await sleep(600); return json({ ok: false, error: 'Akun dinonaktifkan. Hubungi admin.' }, 401); }
           if (db.pending[u] && checkPw(pw, db.pending[u])) return json({ ok: false, error: 'Permintaan akses Anda masih menunggu persetujuan admin.' }, 401);
         }
@@ -115,8 +121,8 @@ export default async (req) => {
     // ---------- kelola pengguna (admin) ----------
     if (parts[0] === 'admin' && parts[1] === 'users') {
       if (role !== 'admin') return json({ error: 'Khusus admin.' }, 403);
-      const db = await loadUsers(); const target = (parts[2] || '').toLowerCase();
-      const pub = () => ({ owner: ADMIN_USER(), users: Object.entries(db.users).map(([u, r]) => ({ username: u, name: r.name, role: r.role, disabled: !!r.disabled, created: r.created })), pending: Object.entries(db.pending).map(([u, r]) => ({ username: u, name: r.name, requestedAt: r.requestedAt })) });
+      const db = await loadUsers(); let target = ''; try { target = decodeURIComponent(parts[2] || '').toLowerCase(); } catch {}
+      const pub = () => ({ owner: OWNER_USER, users: Object.entries(db.users).map(([u, r]) => ({ username: u, name: r.name, role: r.role, disabled: !!r.disabled, created: r.created })), pending: Object.entries(db.pending).map(([u, r]) => ({ username: u, name: r.name, requestedAt: r.requestedAt })) });
       if (method === 'GET' && !target) return json(pub());
       let b = {}; if (method !== 'GET' && method !== 'DELETE') { try { b = await req.json(); } catch {} }
       const roleOk = (r) => (r === 'admin' ? 'admin' : 'viewer');

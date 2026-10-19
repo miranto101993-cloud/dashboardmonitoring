@@ -11,18 +11,16 @@
 ## C. Netlify
 **Add new project → Import an existing project → GitHub** → pilih repo. Build command kosong, Publish directory `public`, Functions `netlify/functions` → **Deploy**.
 
-## D. Akun admin utama (Environment variables)
-**Project configuration → Environment variables**:
-- `ADMIN_USER` (opsional, bawaan `admin`) – nama user admin utama
-- `ADMIN_PASSWORD` (wajib) – password admin utama
-- `AUTH_SECRET` (opsional) – teks acak panjang
-(`VIEW_PASSWORD` tidak dipakai lagi — setiap orang punya user & password sendiri.)
+## D. Akun admin utama
+Admin utama bawaan sudah ada: user `miranto.101993@gmail.com` (password tersimpan sebagai hash di backend, tidak ada teks aslinya di repo). Tidak perlu mengisi variabel apa pun untuk bisa login admin.
+Opsional di Netlify → Environment variables: `ADMIN_USER` + `ADMIN_PASSWORD` (admin utama kedua), `AUTH_SECRET` (teks acak panjang). `VIEW_PASSWORD` tidak dipakai lagi.
 
 ## E. Deploy ulang
 **Deploys → Trigger deploy → Deploy site** → tunggu **Published**.
 
 ## F. Pengguna & hak akses
 - Siapa pun yang membuka situs harus login dengan **user + password**.
+- **Cara login admin:** buka link → pilih tab **Admin** → isi user/email & password → Masuk. Pengguna biasa memilih tab **Pengguna**.
 - Orang baru: klik **"Belum punya akun? Minta akses"** → isi nama, user, password → permintaan masuk antrian.
 - Admin: login → menu kiri bawah **Kelola Pengguna** → **Setujui Viewer / Setujui Admin / Tolak**; juga bisa **Tambah user langsung**, **Jadikan Admin/Viewer**, **Nonaktifkan**, **Reset password**, **Hapus akses**. Hapus/nonaktifkan memutus akses saat itu juga.
 - **Viewer**: semua menu KECUALI **Data Customer** dan **Upload Data**. **Admin**: semua + upload + kelola pengguna. Data Customer hanya dikirim server ke Admin.

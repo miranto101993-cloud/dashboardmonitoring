@@ -404,22 +404,24 @@ body.role-viewer #nav-customer{ display:none !important; }
       var old = document.getElementById('site-login'); if(old) old.remove();
       var d = document.createElement('div'); d.id = 'site-login';
       d.style.cssText = 'position:fixed;inset:0;z-index:100000;background:#17262E;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;font-family:system-ui,-apple-system,sans-serif;';
-      var mode = 'login';
+      var mode = 'login', who = 'user';
       function draw(msg, ok){
         d.innerHTML = '<form style="background:#fff;border-radius:14px;padding:26px 24px;width:100%;max-width:370px;box-shadow:0 20px 60px rgba(0,0,0,.4);">'
           + '<div style="font-weight:800;font-size:17px;color:#17262E;">PERFORMANCE DASHBOARD</div><div style="font-size:12.5px;color:#6b6f6a;margin:2px 0 6px;">Mitra10 Yogyakarta</div>'
+          + (mode === 'login' ? '<div style="display:flex;gap:6px;margin:12px 0 2px;"><button type="button" data-who="user" style="flex:1;padding:9px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;cursor:pointer;background:' + (who==='user' ? '#17262E;color:#fff' : '#fff;color:#444') + ';">Pengguna</button><button type="button" data-who="admin" style="flex:1;padding:9px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;cursor:pointer;background:' + (who==='admin' ? '#D9720B;color:#241500' : '#fff;color:#444') + ';">Admin</button></div>' : '')
           + (mode === 'req' ? '<label style="'+LB+'">Nama lengkap</label><input id="site-name" autocomplete="name" style="'+IN+'">' : '')
-          + '<label style="'+LB+'">User</label><input id="site-user-in" autocomplete="username" autocapitalize="none" spellcheck="false" style="'+IN+'">'
+          + '<label style="'+LB+'">User / Email</label><input id="site-user-in" autocomplete="username" autocapitalize="none" spellcheck="false" style="'+IN+'">'
           + '<label style="'+LB+'">Password' + (mode === 'req' ? ' (min. 8 karakter)' : '') + '</label><input id="site-pw" type="password" autocomplete="' + (mode === 'req' ? 'new-password' : 'current-password') + '" style="'+IN+'">'
           + '<div id="site-err" style="color:' + (ok ? '#1B7F4B' : '#B23A2E') + ';font-size:12.5px;min-height:18px;margin-top:8px;">' + (msg || '') + '</div>'
           + '<button type="submit" style="width:100%;margin-top:6px;padding:12px;border:0;border-radius:9px;background:#D9720B;color:#241500;font-weight:800;font-size:15px;cursor:pointer;">' + (mode === 'req' ? 'Kirim Permintaan Akses' : 'Masuk') + '</button>'
-          + '<button type="button" id="site-toggle" style="width:100%;margin-top:8px;padding:10px;border:0;background:none;color:#555;cursor:pointer;font-size:13px;">' + (mode === 'req' ? '← Sudah punya akun? Masuk' : 'Belum punya akun? Minta akses') + '</button></form>';
+          + (mode === 'login' && who === 'admin' ? '' : '<button type="button" id="site-toggle" style="width:100%;margin-top:8px;padding:10px;border:0;background:none;color:#555;cursor:pointer;font-size:13px;">' + (mode === 'req' ? '← Sudah punya akun? Masuk' : 'Belum punya akun? Minta akses') + '</button>') + '</form>';
         var f = d.querySelector('form'), err = d.querySelector('#site-err');
         setTimeout(function(){ (d.querySelector('#site-name') || d.querySelector('#site-user-in')).focus(); }, 50);
-        d.querySelector('#site-toggle').onclick = function(){ mode = mode === 'req' ? 'login' : 'req'; draw(''); };
+        var tg = d.querySelector('#site-toggle'); if(tg) tg.onclick = function(){ mode = mode === 'req' ? 'login' : 'req'; draw(''); };
+        d.querySelectorAll('[data-who]').forEach(function(bn){ bn.onclick = function(){ var u0 = d.querySelector('#site-user-in').value; who = bn.dataset.who; draw(''); d.querySelector('#site-user-in').value = u0; }; });
         f.onsubmit = async function(e){
           e.preventDefault(); err.style.color = '#B23A2E'; err.textContent = ''; var btn = f.querySelector('button[type=submit]'), label = btn.textContent; btn.disabled = true; btn.textContent = 'Memeriksa…';
-          var body = {username: d.querySelector('#site-user-in').value, password: d.querySelector('#site-pw').value}; if(mode === 'req') body.name = d.querySelector('#site-name').value;
+          var body = {username: d.querySelector('#site-user-in').value, password: d.querySelector('#site-pw').value}; if(mode === 'req') body.name = d.querySelector('#site-name').value; else if(who === 'admin') body.as = 'admin';
           try{
             var r = await fetch('/api/' + (mode === 'req' ? 'request-access' : 'login'), {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body)});
             var j = await r.json();
@@ -512,7 +514,7 @@ body.role-viewer #nav-customer{ display:none !important; }
       if(!data){ d.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;">Gagal memuat. <button id="uc">Tutup</button></div>'; d.querySelector('#uc').onclick = function(){ d.remove(); }; return; }
       var h = '<div style="background:#fff;border-radius:14px;padding:18px;width:100%;max-width:760px;margin:auto 0;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><div style="font-weight:800;font-size:17px;color:#17262E;">Kelola Pengguna</div><button id="uc" style="'+BT+'background:#eee;">Tutup ✕</button></div>'
-        + '<div style="font-size:12px;color:#6b6f6a;margin:4px 0 10px;">Akun utama admin: <b>' + esc(data.owner) + '</b> (dari pengaturan Netlify, tidak bisa dihapus). Menghapus / menonaktifkan user langsung memutus aksesnya.</div>'
+        + '<div style="font-size:12px;color:#6b6f6a;margin:4px 0 10px;">Admin utama: <b>' + esc(data.owner) + '</b> (dari pengaturan Netlify, tidak bisa dihapus). Menghapus / menonaktifkan user langsung memutus aksesnya.</div>'
         + (msg ? '<div style="color:#B23A2E;font-size:13px;margin-bottom:8px;">' + esc(msg) + '</div>' : '');
       h += '<div style="font-weight:700;margin:10px 0 4px;">Permintaan akses (' + data.pending.length + ')</div>';
       if(!data.pending.length) h += '<div style="font-size:13px;color:#777;">Tidak ada permintaan.</div>';
@@ -534,12 +536,12 @@ body.role-viewer #nav-customer{ display:none !important; }
       d.innerHTML = h;
       d.querySelector('#uc').onclick = function(){ d.remove(); };
       d.onclick = async function(e){ var t = e.target.closest('button[data-a]'); if(!t) return; var a = t.dataset.a, u = t.dataset.u, res;
-        if(a === 'approve') res = await call('/' + u + '/approve', 'POST', {role: t.dataset.r});
-        else if(a === 'reject'){ if(!confirm('Tolak permintaan ' + u + '?')) return; res = await call('/' + u + '/reject', 'POST', {}); }
-        else if(a === 'role') res = await call('/' + u + '/update', 'POST', {role: t.dataset.r});
-        else if(a === 'toggle') res = await call('/' + u + '/update', 'POST', {disabled: t.dataset.d === '1'});
-        else if(a === 'pw'){ var p = prompt('Password baru untuk ' + u + ' (min. 8 karakter):'); if(!p) return; res = await call('/' + u + '/update', 'POST', {password: p}); }
-        else if(a === 'del'){ if(!confirm('Hapus akses ' + u + ' secara permanen?')) return; res = await call('/' + u, 'DELETE'); }
+        if(a === 'approve') res = await call('/' + encodeURIComponent(u) + '/approve', 'POST', {role: t.dataset.r});
+        else if(a === 'reject'){ if(!confirm('Tolak permintaan ' + u + '?')) return; res = await call('/' + encodeURIComponent(u) + '/reject', 'POST', {}); }
+        else if(a === 'role') res = await call('/' + encodeURIComponent(u) + '/update', 'POST', {role: t.dataset.r});
+        else if(a === 'toggle') res = await call('/' + encodeURIComponent(u) + '/update', 'POST', {disabled: t.dataset.d === '1'});
+        else if(a === 'pw'){ var p = prompt('Password baru untuk ' + u + ' (min. 8 karakter):'); if(!p) return; res = await call('/' + encodeURIComponent(u) + '/update', 'POST', {password: p}); }
+        else if(a === 'del'){ if(!confirm('Hapus akses ' + u + ' secara permanen?')) return; res = await call('/' + encodeURIComponent(u), 'DELETE'); }
         draw(res || await load()); };
       d.querySelector('#uadd').onsubmit = async function(e){ e.preventDefault(); var fd = new FormData(e.target), o = {}; fd.forEach(function(v, k){ o[k] = v; }); var res = await call('', 'POST', o); draw(res || await load()); };
     }
