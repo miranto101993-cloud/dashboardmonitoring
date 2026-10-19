@@ -11,16 +11,24 @@
 ## C. Netlify
 **Add new project → Import an existing project → GitHub** → pilih repo. Build command kosong, Publish directory `public`, Functions `netlify/functions` → **Deploy**.
 
-## D. Password
-**Project configuration → Environment variables**: `ADMIN_PASSWORD` (wajib), `VIEW_PASSWORD` (disarankan), `AUTH_SECRET` (opsional, teks acak). Simpan.
+## D. Akun admin utama (Environment variables)
+**Project configuration → Environment variables**:
+- `ADMIN_USER` (opsional, bawaan `admin`) – nama user admin utama
+- `ADMIN_PASSWORD` (wajib) – password admin utama
+- `AUTH_SECRET` (opsional) – teks acak panjang
+(`VIEW_PASSWORD` tidak dipakai lagi — setiap orang punya user & password sendiri.)
 
 ## E. Deploy ulang
 **Deploys → Trigger deploy → Deploy site** → tunggu **Published**.
 
-## F. Hak akses
-- **Viewer**: melihat semua menu KECUALI **Data Customer** dan **Upload Data**.
-- **Admin**: semua menu + upload data. Data Customer (database member & transaksi member) hanya dikirim server ke Admin — bukan sekadar disembunyikan di tampilan.
-- Admin pertama kali login setelah versi ini: data tersimpan lama otomatis dimigrasi (±4 detik) agar data customer terpisah dan terlindungi.
+## F. Pengguna & hak akses
+- Siapa pun yang membuka situs harus login dengan **user + password**.
+- Orang baru: klik **"Belum punya akun? Minta akses"** → isi nama, user, password → permintaan masuk antrian.
+- Admin: login → menu kiri bawah **Kelola Pengguna** → **Setujui Viewer / Setujui Admin / Tolak**; juga bisa **Tambah user langsung**, **Jadikan Admin/Viewer**, **Nonaktifkan**, **Reset password**, **Hapus akses**. Hapus/nonaktifkan memutus akses saat itu juga.
+- **Viewer**: semua menu KECUALI **Data Customer** dan **Upload Data**. **Admin**: semua + upload + kelola pengguna. Data Customer hanya dikirim server ke Admin.
+- Admin utama (dari Netlify) tidak bisa dihapus. Lupa password admin utama → ganti `ADMIN_PASSWORD` di Netlify & deploy ulang.
+- Password disimpan sebagai hash (scrypt), bukan teks asli. Ubah peran / reset password otomatis mengeluarkan sesi lama user itu.
+- Catatan: jika dua admin menyimpan perubahan pengguna pada detik yang sama, salah satu bisa tertimpa — ulangi bila perlu.
 
 ## G. Memperbarui data
 Admin: Upload Data → upload file → tunggu "Tersimpan". Viewer otomatis memuat ulang ≤20 detik.

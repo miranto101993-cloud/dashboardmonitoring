@@ -396,34 +396,41 @@ body.role-viewer #nav-customer{ display:none !important; }
   async function gz(str){ var cs = new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))); return b64(await cs.arrayBuffer()); }
   async function gunz(b64s){ var bin = atob(b64s.trim()), by = new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) by[i] = bin.charCodeAt(i); return await new Response(new Blob([by]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); }
 
-  // ---------- layar login ----------
-  function loginUI(opts){
+  // ---------- layar login / minta akses ----------
+  var IN = 'width:100%;margin-top:6px;padding:12px;border:1px solid #cfcabb;border-radius:9px;font-size:16px;box-sizing:border-box;';
+  var LB = 'display:block;font-size:12px;font-weight:700;color:#444;margin-top:12px;';
+  function loginUI(){
     return new Promise(function(resolve){
       var old = document.getElementById('site-login'); if(old) old.remove();
       var d = document.createElement('div'); d.id = 'site-login';
-      d.style.cssText = 'position:fixed;inset:0;z-index:100000;background:#17262E;display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,-apple-system,sans-serif;';
-      d.innerHTML = '<form style="background:#fff;border-radius:14px;padding:26px 24px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.4);">'
-        + '<div style="font-weight:800;font-size:17px;color:#17262E;">PERFORMANCE DASHBOARD</div><div style="font-size:12.5px;color:#6b6f6a;margin:2px 0 16px;">Mitra10 Yogyakarta</div>'
-        + '<label style="font-size:12px;font-weight:700;color:#444;">' + (opts && opts.admin ? 'Password Admin' : 'Password') + '</label>'
-        + '<input id="site-pw" type="password" autocomplete="current-password" style="width:100%;margin-top:6px;padding:12px;border:1px solid #cfcabb;border-radius:9px;font-size:16px;" autofocus>'
-        + '<div id="site-err" style="color:#B23A2E;font-size:12.5px;min-height:18px;margin-top:8px;"></div>'
-        + '<button type="submit" style="width:100%;margin-top:6px;padding:12px;border:0;border-radius:9px;background:#D9720B;color:#241500;font-weight:800;font-size:15px;cursor:pointer;">Masuk</button>'
-        + (opts && opts.cancel ? '<button type="button" id="site-cancel" style="width:100%;margin-top:8px;padding:10px;border:0;background:none;color:#555;cursor:pointer;font-size:13px;">Batal</button>' : '')
-        + '</form>';
-      document.body.appendChild(d);
-      var f = d.querySelector('form'), pw = d.querySelector('#site-pw'), err = d.querySelector('#site-err');
-      setTimeout(function(){ pw.focus(); }, 50);
-      if(opts && opts.cancel) d.querySelector('#site-cancel').onclick = function(){ d.remove(); resolve(null); };
-      f.onsubmit = async function(e){
-        e.preventDefault(); err.textContent = ''; var btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Memeriksa…';
-        try{
-          var r = await fetch('/api/login', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({password: pw.value})});
-          var j = await r.json();
-          if(j.ok){ setTok(j.token); d.remove(); resolve(j); return; }
-          err.textContent = j.error || 'Gagal masuk.';
-        }catch(ex){ err.textContent = 'Tidak bisa menghubungi server.'; }
-        btn.disabled = false; btn.textContent = 'Masuk';
-      };
+      d.style.cssText = 'position:fixed;inset:0;z-index:100000;background:#17262E;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;font-family:system-ui,-apple-system,sans-serif;';
+      var mode = 'login';
+      function draw(msg, ok){
+        d.innerHTML = '<form style="background:#fff;border-radius:14px;padding:26px 24px;width:100%;max-width:370px;box-shadow:0 20px 60px rgba(0,0,0,.4);">'
+          + '<div style="font-weight:800;font-size:17px;color:#17262E;">PERFORMANCE DASHBOARD</div><div style="font-size:12.5px;color:#6b6f6a;margin:2px 0 6px;">Mitra10 Yogyakarta</div>'
+          + (mode === 'req' ? '<label style="'+LB+'">Nama lengkap</label><input id="site-name" autocomplete="name" style="'+IN+'">' : '')
+          + '<label style="'+LB+'">User</label><input id="site-user-in" autocomplete="username" autocapitalize="none" spellcheck="false" style="'+IN+'">'
+          + '<label style="'+LB+'">Password' + (mode === 'req' ? ' (min. 8 karakter)' : '') + '</label><input id="site-pw" type="password" autocomplete="' + (mode === 'req' ? 'new-password' : 'current-password') + '" style="'+IN+'">'
+          + '<div id="site-err" style="color:' + (ok ? '#1B7F4B' : '#B23A2E') + ';font-size:12.5px;min-height:18px;margin-top:8px;">' + (msg || '') + '</div>'
+          + '<button type="submit" style="width:100%;margin-top:6px;padding:12px;border:0;border-radius:9px;background:#D9720B;color:#241500;font-weight:800;font-size:15px;cursor:pointer;">' + (mode === 'req' ? 'Kirim Permintaan Akses' : 'Masuk') + '</button>'
+          + '<button type="button" id="site-toggle" style="width:100%;margin-top:8px;padding:10px;border:0;background:none;color:#555;cursor:pointer;font-size:13px;">' + (mode === 'req' ? '← Sudah punya akun? Masuk' : 'Belum punya akun? Minta akses') + '</button></form>';
+        var f = d.querySelector('form'), err = d.querySelector('#site-err');
+        setTimeout(function(){ (d.querySelector('#site-name') || d.querySelector('#site-user-in')).focus(); }, 50);
+        d.querySelector('#site-toggle').onclick = function(){ mode = mode === 'req' ? 'login' : 'req'; draw(''); };
+        f.onsubmit = async function(e){
+          e.preventDefault(); err.style.color = '#B23A2E'; err.textContent = ''; var btn = f.querySelector('button[type=submit]'), label = btn.textContent; btn.disabled = true; btn.textContent = 'Memeriksa…';
+          var body = {username: d.querySelector('#site-user-in').value, password: d.querySelector('#site-pw').value}; if(mode === 'req') body.name = d.querySelector('#site-name').value;
+          try{
+            var r = await fetch('/api/' + (mode === 'req' ? 'request-access' : 'login'), {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body)});
+            var j = await r.json();
+            if(mode === 'req'){ if(j.ok){ mode = 'login'; draw(j.message, true); return; } }
+            else if(j.ok){ setTok(j.token); d.remove(); resolve(j); return; }
+            err.textContent = j.error || 'Gagal.';
+          }catch(ex){ err.textContent = 'Tidak bisa menghubungi server.'; }
+          btn.disabled = false; btn.textContent = label;
+        };
+      }
+      draw(''); document.body.appendChild(d);
     });
   }
 
@@ -470,7 +477,8 @@ body.role-viewer #nav-customer{ display:none !important; }
     var L = document.getElementById('boot-loading'), say = function(m){ if(L) L.innerHTML = '<div style="max-width:420px;padding:24px;text-align:center;line-height:1.55;font-weight:500;">' + m + '</div>'; };
     say('Memeriksa akses…');
     var s = await (await fetch('/api/session', {headers: tok() ? {Authorization: 'Bearer ' + tok()} : {}})).json();
-    if(!s.role){ if(L) L.style.display = 'none'; var lg = await loginUI(); if(L) L.style.display = 'flex'; s = await (await fetch('/api/session', {headers: {Authorization: 'Bearer ' + tok()}})).json(); }
+    if(!s.role){ if(L) L.style.display = 'none'; await loginUI(); if(L) L.style.display = 'flex'; s = await (await fetch('/api/session', {headers: {Authorization: 'Bearer ' + tok()}})).json(); }
+    window.__USER = s.user; window.__NAME = s.name;
     ROLE = s.role; window.__REV = s.rev || '0'; window.__ROLE = ROLE;
     document.body.classList.add('role-' + (ROLE || 'viewer'));
     say('Mengunduh data terbaru dari server…');
@@ -485,16 +493,69 @@ body.role-viewer #nav-customer{ display:none !important; }
     startSiteUi();
   };
 
+
+  // ---------- panel Kelola Pengguna (admin) ----------
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  async function openUsers(){
+    var old = document.getElementById('site-users-panel'); if(old) old.remove();
+    var d = document.createElement('div'); d.id = 'site-users-panel';
+    d.style.cssText = 'position:fixed;inset:0;z-index:99995;background:rgba(10,18,22,.6);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;font-family:system-ui,-apple-system,sans-serif;';
+    document.body.appendChild(d);
+    var BT = 'border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;margin:2px 2px 2px 0;';
+    var msg = '';
+    async function call(path, method, body){
+      var r = await api('admin/users' + path, {method: method, headers: {'content-type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+      var j = await r.json().catch(function(){ return {}; }); if(!r.ok){ msg = j.error || ('Gagal (HTTP ' + r.status + ')'); return null; } msg = ''; return j;
+    }
+    async function load(){ var r = await api('admin/users'); return r.ok ? r.json() : null; }
+    async function draw(data){
+      if(!data){ d.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;">Gagal memuat. <button id="uc">Tutup</button></div>'; d.querySelector('#uc').onclick = function(){ d.remove(); }; return; }
+      var h = '<div style="background:#fff;border-radius:14px;padding:18px;width:100%;max-width:760px;margin:auto 0;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><div style="font-weight:800;font-size:17px;color:#17262E;">Kelola Pengguna</div><button id="uc" style="'+BT+'background:#eee;">Tutup ✕</button></div>'
+        + '<div style="font-size:12px;color:#6b6f6a;margin:4px 0 10px;">Akun utama admin: <b>' + esc(data.owner) + '</b> (dari pengaturan Netlify, tidak bisa dihapus). Menghapus / menonaktifkan user langsung memutus aksesnya.</div>'
+        + (msg ? '<div style="color:#B23A2E;font-size:13px;margin-bottom:8px;">' + esc(msg) + '</div>' : '');
+      h += '<div style="font-weight:700;margin:10px 0 4px;">Permintaan akses (' + data.pending.length + ')</div>';
+      if(!data.pending.length) h += '<div style="font-size:13px;color:#777;">Tidak ada permintaan.</div>';
+      data.pending.forEach(function(p){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;"><div><b>' + esc(p.name) + '</b> <span style="color:#777;">(' + esc(p.username) + ')</span><div style="font-size:11.5px;color:#888;">' + esc((p.requestedAt || '').slice(0,16).replace('T',' ')) + '</div></div><div><button data-a="approve" data-r="viewer" data-u="' + esc(p.username) + '" style="'+BT+'background:#D9720B;color:#241500;">Setujui Viewer</button><button data-a="approve" data-r="admin" data-u="' + esc(p.username) + '" style="'+BT+'background:#17262E;color:#fff;">Setujui Admin</button><button data-a="reject" data-u="' + esc(p.username) + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Tolak</button></div></div>'; });
+      h += '<div style="font-weight:700;margin:14px 0 4px;">Pengguna aktif (' + data.users.length + ')</div>';
+      if(!data.users.length) h += '<div style="font-size:13px;color:#777;">Belum ada pengguna selain admin utama.</div>';
+      data.users.forEach(function(u){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div><b>' + esc(u.name) + '</b> <span style="color:#777;">(' + esc(u.username) + ')</span> · ' + (u.role === 'admin' ? 'Admin' : 'Viewer') + (u.disabled ? ' · <span style="color:#B23A2E;">nonaktif</span>' : '') + '</div><div>'
+        + '<button data-a="role" data-r="' + (u.role === 'admin' ? 'viewer' : 'admin') + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Jadikan ' + (u.role === 'admin' ? 'Viewer' : 'Admin') + '</button>'
+        + '<button data-a="toggle" data-d="' + (u.disabled ? 0 : 1) + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">' + (u.disabled ? 'Aktifkan' : 'Nonaktifkan') + '</button>'
+        + '<button data-a="pw" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Reset password</button>'
+        + '<button data-a="del" data-u="' + esc(u.username) + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Hapus akses</button></div></div>'; });
+      h += '<div style="font-weight:700;margin:14px 0 4px;">Tambah user langsung</div><form id="uadd" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;">'
+        + '<input name="name" placeholder="Nama lengkap" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;">'
+        + '<input name="username" placeholder="user (huruf kecil)" autocapitalize="none" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;">'
+        + '<input name="password" placeholder="password (min. 8)" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;">'
+        + '<select name="role" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'
+        + '<button type="submit" style="'+BT+'background:#D9720B;color:#241500;padding:10px;">Tambah</button></form>'
+        + '<div style="font-size:11.5px;color:#888;margin-top:10px;">Viewer: melihat semua menu kecuali Data Customer &amp; Upload Data. Admin: semua menu + upload + kelola pengguna.</div></div>';
+      d.innerHTML = h;
+      d.querySelector('#uc').onclick = function(){ d.remove(); };
+      d.onclick = async function(e){ var t = e.target.closest('button[data-a]'); if(!t) return; var a = t.dataset.a, u = t.dataset.u, res;
+        if(a === 'approve') res = await call('/' + u + '/approve', 'POST', {role: t.dataset.r});
+        else if(a === 'reject'){ if(!confirm('Tolak permintaan ' + u + '?')) return; res = await call('/' + u + '/reject', 'POST', {}); }
+        else if(a === 'role') res = await call('/' + u + '/update', 'POST', {role: t.dataset.r});
+        else if(a === 'toggle') res = await call('/' + u + '/update', 'POST', {disabled: t.dataset.d === '1'});
+        else if(a === 'pw'){ var p = prompt('Password baru untuk ' + u + ' (min. 8 karakter):'); if(!p) return; res = await call('/' + u + '/update', 'POST', {password: p}); }
+        else if(a === 'del'){ if(!confirm('Hapus akses ' + u + ' secara permanen?')) return; res = await call('/' + u, 'DELETE'); }
+        draw(res || await load()); };
+      d.querySelector('#uadd').onsubmit = async function(e){ e.preventDefault(); var fd = new FormData(e.target), o = {}; fd.forEach(function(v, k){ o[k] = v; }); var res = await call('', 'POST', o); draw(res || await load()); };
+    }
+    draw(await load());
+  }
+
   // ---------- UI situs: peran, info pengguna, banner data baru ----------
   function startSiteUi(){
     var side = document.querySelector('.sidebar'), foot = document.getElementById('sidebar-foot');
     if(side && !document.getElementById('site-user')){
       var u = document.createElement('div'); u.id = 'site-user';
       u.style.cssText = 'font-size:11.5px;color:#8c9a92;padding:8px 10px 2px;';
-      u.innerHTML = 'Masuk sebagai <b style="color:#fff">' + (ROLE === 'admin' ? 'Admin' : 'Viewer') + '</b> · ' + (ROLE === 'admin' ? '' : '<a href="#" id="site-admin" style="color:#F2B35E;">Login Admin</a> · ') + '<a href="#" id="site-out" style="color:#F2B35E;">Keluar</a>';
+      u.innerHTML = 'Masuk: <b style="color:#fff">' + (window.__NAME || window.__USER) + '</b> (' + (ROLE === 'admin' ? 'Admin' : 'Viewer') + ')<br>' + (ROLE === 'admin' ? '<a href="#" id="site-users" style="color:#F2B35E;">Kelola Pengguna</a> · ' : '') + '<a href="#" id="site-out" style="color:#F2B35E;">Keluar</a>';
       if(foot && foot.parentNode) foot.parentNode.insertBefore(u, foot.nextSibling); else side.appendChild(u);
       u.querySelector('#site-out').onclick = function(e){ e.preventDefault(); setTok(''); location.reload(); };
-      var a = u.querySelector('#site-admin'); if(a) a.onclick = async function(e){ e.preventDefault(); var r = await loginUI({admin:true, cancel:true}); if(r && r.role === 'admin') location.reload(); else if(r) { setTok(''); location.reload(); } };
+      var ua = u.querySelector('#site-users'); if(ua) ua.onclick = function(e){ e.preventDefault(); openUsers(); };
     }
     var banner = null;
     function show(){ if(banner) return; banner = document.createElement('div'); banner.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:99990;background:#17262E;color:#fff;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:13.5px;';
