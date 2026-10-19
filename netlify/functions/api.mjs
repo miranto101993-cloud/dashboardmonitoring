@@ -44,6 +44,8 @@ function dataFile(name) {
   for (const r of roots) for (const rel of ['netlify/data', 'data']) { const f = join(r, rel, name); if (existsSync(f)) return f; }
   return null;
 }
+const PRIVATE_DATA = ['member', 'memtx']; // Data Customer: hanya admin
+const isPrivKey = (k) => /priv/.test(k);
 const SAFE_KEY = /^[A-Za-z0-9_:.\-]{1,120}$/;
 const touchRev = async () => { const rev = Date.now().toString(36) + Math.random().toString(36).slice(2, 6); await store().set('rev', rev); return rev; };
 
@@ -78,9 +80,11 @@ export default async (req) => {
     if (parts[0] === 'data') {
       if (parts[1] === 'manifest') {
         const f = dataFile('manifest.json'); if (!f) return json({ error: 'Data bawaan tidak ditemukan di server.' }, 500);
-        return new Response(readFileSync(f), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+        const man = JSON.parse(readFileSync(f, 'utf8')); if (role !== 'admin') for (const n of PRIVATE_DATA) delete man.parts[n];
+        return json(man);
       }
       const name = parts[1], idx = parts[2];
+      if (PRIVATE_DATA.includes(name) && role !== 'admin') return json({ error: 'Khusus admin.' }, 403);
       if (!/^[a-z]+$/.test(name || '') || !/^\d+$/.test(idx || '')) return json({ error: 'Tidak valid.' }, 400);
       const f = dataFile(`${name}.${idx}.txt`); if (!f) return json({ error: 'Bagian data tidak ada.' }, 404);
       return text(readFileSync(f, 'utf8'), 200, { 'cache-control': 'private, max-age=31536000, immutable' });
@@ -91,6 +95,7 @@ export default async (req) => {
       const key = decodeURIComponent(parts.slice(1).join('/'));
       if (!SAFE_KEY.test(key)) return json({ error: 'Kunci tidak valid.' }, 400);
       if (method === 'GET') {
+        if (isPrivKey(key) && role !== 'admin') return json({ error: 'Khusus admin.' }, 403);
         const v = await store().get('kv/' + key, { type: 'text' });
         if (v == null) return json({ error: 'Tidak ditemukan.' }, 404);
         return text(v, 200, { 'cache-control': url.searchParams.get('v') ? 'private, max-age=31536000, immutable' : 'no-store' });

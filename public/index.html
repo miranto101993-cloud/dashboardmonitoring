@@ -376,6 +376,7 @@ th[data-sort]{ cursor:pointer; user-select:none; } th[data-sort]:hover{ backgrou
 </style>
 <style>/* Mode website: pengguna Viewer tidak melihat menu Upload */
 body.role-viewer #nav-upload{ display:none !important; }
+body.role-viewer #nav-customer{ display:none !important; }
 </style>
 <link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 </head>
@@ -1025,6 +1026,9 @@ async function persistState(){
   const payload = {};
   PERSIST_KEYS.forEach(k => { payload[k] = STATE[k]; });
   payload.__ver = (SEED.meta && SEED.meta.dataVersion) || 0;
+  const priv = {memberDb: payload.memberDb, memberTx: payload.memberTx}; delete payload.memberDb; delete payload.memberTx;
+  const privStr = JSON.stringify(priv), privN = Math.ceil(privStr.length / PERSIST_CHUNK_SIZE) || 1; payload.__privN = privN;
+  for(let i=0;i<privN;i++) await window.storage.set(PERSIST_PREFIX+'priv'+i, privStr.slice(i*PERSIST_CHUNK_SIZE, (i+1)*PERSIST_CHUNK_SIZE), false);
   const str = JSON.stringify(payload);
   const nChunks = Math.ceil(str.length / PERSIST_CHUNK_SIZE) || 1;
   for(let i=0;i<nChunks;i++){
@@ -1046,6 +1050,7 @@ async function tryLoadPersistedState(){
     str += c.value;
   }
   const payload = JSON.parse(str);
+  if(window.__ROLE==='admin'){ if(payload.__privN){ let ps=''; for(let i=0;i<payload.__privN;i++){ const c = await window.storage.get(PERSIST_PREFIX+'priv'+i, false); ps += c.value; } const pv = JSON.parse(ps); payload.memberDb = pv.memberDb; payload.memberTx = pv.memberTx; } else setTimeout(()=>{ persistState().catch(()=>{}); }, 4000); }
   if((payload.__ver||0) < ((SEED.meta && SEED.meta.dataVersion)||0)) return false; // data bawaan lebih baru dari yang tersimpan di browser
   const keepSeed = {}; // SQV & Stock DC bawaan yang tanggalnya lebih baru dari yang tersimpan di browser tidak boleh tertimpa
   [['sqv','stockDate',['sqvItems']],['dc','reportDate',['dcByItem','dcBySite','dcBySiteStatus','dcSites','dcAging']],['salper','uploadedAt',['salperFact','budgetSalperFact','tlMentor']]].forEach(([mk,dk,keys])=>{
@@ -2830,6 +2835,7 @@ function mkChart(id, config){
 
 let currentSection = null;
 function showSection(id){
+  if(window.__ROLE==='viewer' && (id==='customer' || id==='upload')) id = 'overview';
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('nav-'+id).classList.add('active');
   document.getElementById('topbar-title').textContent = TITLES[id];
