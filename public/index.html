@@ -480,7 +480,7 @@ body.role-viewer #nav-customer{ display:none !important; }
     say('Memeriksa akses…');
     var s = await (await fetch('/api/session', {headers: tok() ? {Authorization: 'Bearer ' + tok()} : {}})).json();
     if(!s.role){ if(L) L.style.display = 'none'; await loginUI(); if(L) L.style.display = 'flex'; s = await (await fetch('/api/session', {headers: {Authorization: 'Bearer ' + tok()}})).json(); }
-    window.__USER = s.user; window.__NAME = s.name;
+    window.__USER = s.user; window.__NAME = s.name; window.__CANMANAGE = !!s.canManage;
     ROLE = s.role; window.__REV = s.rev || '0'; window.__ROLE = ROLE;
     document.body.classList.add('role-' + (ROLE || 'viewer'));
     say('Mengunduh data terbaru dari server…');
@@ -532,7 +532,7 @@ body.role-viewer #nav-customer{ display:none !important; }
         + '<input name="password" placeholder="password (min. 8)" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;">'
         + '<select name="role" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'
         + '<button type="submit" style="'+BT+'background:#D9720B;color:#241500;padding:10px;">Tambah</button></form>'
-        + '<div style="font-size:11.5px;color:#888;margin-top:10px;">Viewer: melihat semua menu kecuali Data Customer &amp; Upload Data. Admin: semua menu + upload + kelola pengguna.</div></div>';
+        + '<div style="font-size:11.5px;color:#888;margin-top:10px;">Viewer: melihat semua menu kecuali Data Customer &amp; Upload Data. Admin: semua menu + upload data + Data Customer (kelola pengguna hanya untuk admin utama).</div></div>';
       d.innerHTML = h;
       d.querySelector('#uc').onclick = function(){ d.remove(); };
       d.onclick = async function(e){ var t = e.target.closest('button[data-a]'); if(!t) return; var a = t.dataset.a, u = t.dataset.u, res;
@@ -554,7 +554,7 @@ body.role-viewer #nav-customer{ display:none !important; }
     if(side && !document.getElementById('site-user')){
       var u = document.createElement('div'); u.id = 'site-user';
       u.style.cssText = 'font-size:11.5px;color:#8c9a92;padding:8px 10px 2px;';
-      u.innerHTML = 'Masuk: <b style="color:#fff">' + (window.__NAME || window.__USER) + '</b> (' + (ROLE === 'admin' ? 'Admin' : 'Viewer') + ')<br>' + (ROLE === 'admin' ? '<a href="#" id="site-users" style="color:#F2B35E;">Kelola Pengguna</a> · ' : '') + '<a href="#" id="site-out" style="color:#F2B35E;">Keluar</a>';
+      u.innerHTML = 'Masuk: <b style="color:#fff">' + (window.__NAME || window.__USER) + '</b> (' + (ROLE === 'admin' ? 'Admin' : 'Viewer') + ')<br>' + (window.__CANMANAGE ? '<a href="#" id="site-users" style="color:#F2B35E;">Kelola Pengguna</a> · ' : '') + '<a href="#" id="site-out" style="color:#F2B35E;">Keluar</a>';
       if(foot && foot.parentNode) foot.parentNode.insertBefore(u, foot.nextSibling); else side.appendChild(u);
       u.querySelector('#site-out').onclick = function(e){ e.preventDefault(); setTok(''); location.reload(); };
       var ua = u.querySelector('#site-users'); if(ua) ua.onclick = function(e){ e.preventDefault(); openUsers(); };

@@ -112,7 +112,7 @@ export default async (req) => {
 
     if (path === 'session' && method === 'GET') {
       let rev = '0'; try { rev = (await store().get('rev')) || '0'; } catch {}
-      return json({ authRequired: true, role: me ? me.role : null, user: me ? me.user : null, name: me ? me.name : null, adminEnabled: !!ADMIN_PASSWORD(), rev });
+      return json({ authRequired: true, role: me ? me.role : null, user: me ? me.user : null, canManage: !!me && me.user === OWNER_USER, name: me ? me.name : null, adminEnabled: !!ADMIN_PASSWORD(), rev });
     }
 
     if (!me) return json({ error: 'Perlu login.' }, 401);
@@ -120,7 +120,7 @@ export default async (req) => {
 
     // ---------- kelola pengguna (admin) ----------
     if (parts[0] === 'admin' && parts[1] === 'users') {
-      if (role !== 'admin') return json({ error: 'Khusus admin.' }, 403);
+      if (me.user !== OWNER_USER) return json({ error: 'Kelola pengguna hanya untuk admin utama (' + OWNER_USER + ').' }, 403);
       const db = await loadUsers(); let target = ''; try { target = decodeURIComponent(parts[2] || '').toLowerCase(); } catch {}
       const pub = () => ({ owner: OWNER_USER, users: Object.entries(db.users).map(([u, r]) => ({ username: u, name: r.name, role: r.role, disabled: !!r.disabled, created: r.created })), pending: Object.entries(db.pending).map(([u, r]) => ({ username: u, name: r.name, requestedAt: r.requestedAt })) });
       if (method === 'GET' && !target) return json(pub());

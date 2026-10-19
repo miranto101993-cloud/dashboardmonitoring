@@ -22,8 +22,9 @@ Opsional di Netlify → Environment variables: `ADMIN_USER` + `ADMIN_PASSWORD` (
 - Siapa pun yang membuka situs harus login dengan **user + password**.
 - **Cara login admin:** buka link → pilih tab **Admin** → isi user/email & password → Masuk. Pengguna biasa memilih tab **Pengguna**.
 - Orang baru: klik **"Belum punya akun? Minta akses"** → isi nama, user, password → permintaan masuk antrian.
-- Admin: login → menu kiri bawah **Kelola Pengguna** → **Setujui Viewer / Setujui Admin / Tolak**; juga bisa **Tambah user langsung**, **Jadikan Admin/Viewer**, **Nonaktifkan**, **Reset password**, **Hapus akses**. Hapus/nonaktifkan memutus akses saat itu juga.
-- **Viewer**: semua menu KECUALI **Data Customer** dan **Upload Data**. **Admin**: semua + upload + kelola pengguna. Data Customer hanya dikirim server ke Admin.
+- **Hanya admin utama (`miranto.101993@gmail.com`)** yang punya menu **Kelola Pengguna**. Admin lain tetap bisa Upload Data & Data Customer, tapi tidak bisa mengelola pengguna.
+- Admin utama: login → menu kiri bawah **Kelola Pengguna** → **Setujui Viewer / Setujui Admin / Tolak**; juga bisa **Tambah user langsung**, **Jadikan Admin/Viewer**, **Nonaktifkan**, **Reset password**, **Hapus akses**. Hapus/nonaktifkan memutus akses saat itu juga.
+- **Viewer**: semua menu KECUALI **Data Customer** dan **Upload Data**. **Admin**: semua + Upload Data + Data Customer (tanpa Kelola Pengguna). Data Customer hanya dikirim server ke Admin.
 - Admin utama (dari Netlify) tidak bisa dihapus. Lupa password admin utama → ganti `ADMIN_PASSWORD` di Netlify & deploy ulang.
 - Password disimpan sebagai hash (scrypt), bukan teks asli. Ubah peran / reset password otomatis mengeluarkan sesi lama user itu.
 - Catatan: jika dua admin menyimpan perubahan pengguna pada detik yang sama, salah satu bisa tertimpa — ulangi bila perlu.
