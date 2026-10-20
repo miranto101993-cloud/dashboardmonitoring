@@ -3,3 +3,9 @@ Data bersama untuk semua pengguna; admin upload → server (Netlify Blobs). Logi
 Struktur: `public/` (halaman), `netlify/functions/api.mjs` (backend), `netlify/data/` (data bawaan, hanya setelah login).
 Admin utama bawaan: miranto.101993@gmail.com. Env Netlify opsional: ADMIN_USER+ADMIN_PASSWORD, AUTH_SECRET. Langkah rinci: PANDUAN_PASANG.md.
 Diuji lokal (server Node + Blobs tiruan), belum di Netlify sungguhan.
+
+## Pembaruan: kriteria permintaan akses & halaman Salesperson
+- Minta akses punya 3 kriteria: **Manager** (= Admin: semua menu + Upload Data + Data Customer, tanpa Kelola Pengguna), **Team Leader** (semua menu kecuali Data Customer & Upload Data; admin utama bisa menaikkan ke Admin) dan **Sales** (user = Salesperson ID, nama harus memuat salah satu kata nama di database, password min. 8 karakter).
+- Halaman Salesperson: Ranking, Actual, Budget, Achieve, Sales LY, Growth, Diff Budget, Diff Growth, Sales by Brand, Protection, Project, WhatsApp, Invoice, IPD, IPI, Basket Size; filter YTD / Semester / Kuartal / Bulan (+ Minggu) / Tanggal.
+- Master Brand dicocokkan lewat master brand tiap item; bulan terakhir diambil dari data yang benar-benar ada (termasuk hasil upload admin).
+- Setelah deploy, unggah ulang file penjualan terbaru (mis. Oktober) agar invoice Project/WhatsApp & Sales by Brand terisi untuk bulan yang diunggah sebelum pembaruan ini.

@@ -465,178 +465,265 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
   function legend(items){ return '<div class="sx-leg">' + items.map(function(i){ return '<span><i style="background:'+i[1]+'"></i>'+esc(i[0])+'</span>'; }).join('') + '</div>'; }
   function card(l, v, s){ return '<div class="sx-card"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s ? '<div class="s">'+s+'</div>' : '')+'</div>'; }
 
+  var CSS2 = '\
+  .sx-wk{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }\
+  .sx-wk button{ border:1px solid #cfcabb; background:#fff; color:#444; border-radius:8px; padding:6px 11px; font-weight:700; font-size:12.5px; cursor:pointer; }\
+  .sx-wk button.on{ background:'+C_CUR+'; border-color:'+C_CUR+'; color:#fff; }\
+  .sx-cards.w3{ grid-template-columns:repeat(2,1fr); } @media(min-width:720px){ .sx-cards.w3{ grid-template-columns:repeat(3,1fr); } }\
+  .sx-card .v{ font-size:18px; } .sx-card .s{ line-height:1.45; } .sx-card .s b{ color:'+INK+'; }\
+  .sx-t td small{ display:block; color:'+SOFT+'; font-size:11px; margin-top:1px; }\
+  .sx-t td:first-child{ min-width:150px; }\
+  .sx-h2{ font-weight:800; font-size:13px; color:'+SOFT+'; margin:16px 0 8px; text-transform:uppercase; letter-spacing:.04em; }\
+  .sx-sel{ font-size:15px; padding:8px 10px; border:1px solid #cfcabb; border-radius:9px; background:#fff; color:'+INK+'; max-width:100%; }\
+  ';
+  var MX = 'Rp';
+  function pct(n, dg){ return n == null ? '–' : n.toLocaleString('id-ID', {maximumFractionDigits: dg == null ? 1 : dg}) + '%'; }
+  function fD(n){ n = num(n); return (n >= 0 ? '+' : '-') + fRp(Math.abs(n)).replace('Rp ', 'Rp '); }
+  function dClr(n, html){ return '<span style="color:' + (n >= 0 ? GOOD : BAD) + ';font-weight:700;">' + html + '</span>'; }
+  function two(n){ return String(n).padStart(2, '0'); }
+  function dim(y, m){ return new Date(y, m, 0).getDate(); }
+
   window.__salesApp = function(D, onLogout){
     var yrs = (D.meta && D.meta.years) || [2025, 2026], cur = Math.max.apply(null, yrs), ly = cur - 1;
-    var latestM = num(D.meta && D.meta.latestMonth2026) || 12, latestD = String((D.meta && D.meta.latestDate2026) || D.sales.to || '').slice(0,10);
-    var dFrom = D.sales && D.sales.from ? String(D.sales.from).slice(0,10) : cur + '-01-01', dTo = (D.sales && D.sales.to ? String(D.sales.to).slice(0,10) : latestD) || cur + '-12-31';
-    var S = {per:'ytd', sem:latestM > 6 ? 2 : 1, q:Math.ceil(latestM / 3), month:latestM, from:dTo, to:dTo, tab:'me', find:'', sort:'amt', cat:'', limit:50};
+    var latestD = String((D.meta && D.meta.latestDate2026) || (D.sales && D.sales.to) || cur + '-12-31').slice(0, 10);
+    var lm = +latestD.slice(5, 7), ld = +latestD.slice(8, 10), firstD = (D.sales && D.sales.from ? String(D.sales.from).slice(0, 10) : cur + '-01-01');
+    var U = D.user, isPB = D.brandMode === 'pb', hasBrand = D.brandMode === 'brand' || D.brandMode === 'pb';
+    var S = {per:'ytd', sem:lm > 6 ? 2 : 1, q:Math.ceil(lm / 3), month:lm, week:0, date:latestD, tab:'me', find:'', sort:'amt', cat:'', cls:'', show:'sold', limit:50, tcat:'', tbrand:''};
     try{ var sv = JSON.parse(sessionStorage.getItem('sx_state') || 'null'); if(sv){ for(var k in sv) if(k in S) S[k] = sv[k]; } }catch(e){}
+    if(S.month > lm || S.month < 1) S.month = lm; if(S.q > Math.ceil(lm / 3)) S.q = Math.ceil(lm / 3); if(S.sem === 2 && lm <= 6) S.sem = 1; if(S.date > latestD || S.date < firstD) S.date = latestD;
     var root = document.getElementById('sx'); if(!root){ root = document.createElement('div'); root.id = 'sx'; document.body.appendChild(root); }
-    if(!document.getElementById('sx-css')){ var st = document.createElement('style'); st.id = 'sx-css'; st.textContent = CSS; document.head.appendChild(st); }
-    var U = D.user;
+    if(!document.getElementById('sx-css')){ var st = document.createElement('style'); st.id = 'sx-css'; st.textContent = CSS + CSS2; document.head.appendChild(st); }
 
-    function monthsOf(){
-      var all = []; for(var m = 1; m <= latestM; m++) all.push(m);
-      if(S.per === 'ytd') return all;
-      if(S.per === 'sem') return all.filter(function(m){ return S.sem === 1 ? m <= 6 : m > 6; });
-      if(S.per === 'q') return all.filter(function(m){ return Math.ceil(m / 3) === S.q; });
-      if(S.per === 'month') return [S.month];
-      return [];
+    /* ---------- periode → rentang tanggal tahun berjalan ---------- */
+    function maxDayOf(m){ return m === lm ? ld : dim(cur, m); }
+    function period(){
+      var s, e, m1, m2;
+      if(S.per === 'ytd'){ m1 = 1; m2 = lm; }
+      else if(S.per === 'sem'){ m1 = (S.sem - 1) * 6 + 1; m2 = Math.min(lm, m1 + 5); }
+      else if(S.per === 'q'){ m1 = (S.q - 1) * 3 + 1; m2 = Math.min(lm, m1 + 2); }
+      else if(S.per === 'month'){ m1 = m2 = S.month; }
+      else { var dm = +S.date.slice(5, 7), dd = +S.date.slice(8, 10); return {parts:[{m:dm, d1:dd, d2:dd}], s:S.date, e:S.date}; }
+      var parts = [];
+      for(var m = m1; m <= m2; m++){ var d1 = 1, d2 = maxDayOf(m); if(S.per === 'month' && S.week){ d1 = (S.week - 1) * 7 + 1; d2 = Math.min(S.week === 5 ? dim(cur, m) : S.week * 7, maxDayOf(m)); } if(d1 <= d2) parts.push({m:m, d1:d1, d2:d2}); }
+      if(!parts.length) return {parts:[], s:latestD, e:latestD};
+      var a = parts[0], z = parts[parts.length - 1];
+      return {parts:parts, s:cur + '-' + two(a.m) + '-' + two(a.d1), e:cur + '-' + two(z.m) + '-' + two(z.d2)};
     }
-    function periodLabel(){
-      if(S.per === 'ytd') return 'YTD ' + cur + ' (Jan–' + MS[latestM-1] + ')';
-      if(S.per === 'sem') return 'Semester ' + S.sem + ' ' + cur;
-      if(S.per === 'q') return 'Kuartal ' + S.q + ' ' + cur;
-      if(S.per === 'month') return MN[S.month-1] + ' ' + cur;
-      return S.from === S.to ? fDate(S.from) : fDate(S.from) + ' – ' + fDate(S.to);
+    function weeksOf(m){ var out = [], mx = maxDayOf(m); for(var w = 1; w <= 5; w++){ var d1 = (w - 1) * 7 + 1, d2 = w === 5 ? dim(cur, m) : w * 7; if(d1 > mx) break; out.push({w:w, d1:d1, d2:Math.min(d2, mx)}); } return out; }
+    function periodLabel(P){
+      var base;
+      if(S.per === 'ytd') base = 'YTD ' + cur + ' (Jan–' + MS[lm-1] + ')';
+      else if(S.per === 'sem') base = 'Semester ' + S.sem + ' ' + cur;
+      else if(S.per === 'q') base = 'Kuartal ' + S.q + ' ' + cur;
+      else if(S.per === 'month') base = MN[S.month-1] + ' ' + cur + (S.week ? ' · Minggu ' + S.week + ' (tgl ' + P.parts[0].d1 + '–' + P.parts[0].d2 + ')' : '');
+      else base = fDate(S.date);
+      return base;
     }
-    function inRange(r){ if(r.y !== cur || !r.d) return false; var ds = cur + '-' + String(r.m).padStart(2,'0') + '-' + String(r.d).padStart(2,'0'); return ds >= S.from && ds <= S.to; }
-    function sel(rows, year, ms){ var set = {}; ms.forEach(function(m){ set[m] = 1; }); return rows.filter(function(r){ return r.y === year && set[r.m]; }); }
-    function sum(rows, f){ var t = 0; rows.forEach(function(r){ t += num(r[f]); }); return t; }
+    /* ---------- agregasi ---------- */
+    function idxCur(rows, fields){ var o = {}; rows.forEach(function(r){ if(r.y !== cur || !r.d) return; var k = r.m * 100 + r.d, a = o[k] || (o[k] = {}); fields.forEach(function(f){ a[f] = (a[f] || 0) + num(r[f]); }); if(fields.indexOf('inv') >= 0 && num(r.inv) > 0) a.days = (a.days || 0) + 1; if(r.projInv === undefined) a.noPI = 1; }); return o; }
+    function idxLy(rows, fields){ var o = {}; rows.forEach(function(r){ if(r.y !== ly) return; var a = o[r.m] || (o[r.m] = {}); fields.forEach(function(f){ a[f] = (a[f] || 0) + num(r[f]); }); }); return o; }
+    function sumCur(ix, P, fields){ var t = {}; fields.forEach(function(f){ t[f] = 0; }); t.days = 0; P.parts.forEach(function(p){ for(var d = p.d1; d <= p.d2; d++){ var a = ix[p.m * 100 + d]; if(a){ fields.forEach(function(f){ t[f] += a[f] || 0; }); t.days += a.days || 0; if(a.noPI) t.noPI = 1; } } }); return t; }
+    function lyW(p){ var n = dim(ly, p.m); return (p.d1 === 1 && p.d2 >= dim(cur, p.m)) ? 1 : (p.d2 - p.d1 + 1) / n; }
+    function sumLy(il, P, fields){ var t = {}; fields.forEach(function(f){ t[f] = 0; }); P.parts.forEach(function(p){ var a = il[p.m]; if(a){ var w = lyW(p); fields.forEach(function(f){ t[f] += (a[f] || 0) * w; }); } }); return t; }
+    function budgetOf(P, list){
+      list = list || D.budget; if(!list || !list.length) return null; var t = 0;
+      P.parts.forEach(function(p){ var row = list.filter(function(r){ return r.m === p.m; })[0]; if(!row) return; var arr = D.budgetDay && D.budgetDay[p.m], share;
+        if(arr && arr.length){ var tot = 0, part = 0; for(var d = 1; d <= dim(cur, p.m); d++){ var v = arr[d-1] || 0; tot += v; if(d >= p.d1 && d <= p.d2) part += v; } share = tot > 0 ? part / tot : (p.d2 - p.d1 + 1) / dim(cur, p.m); } else share = (p.d2 - p.d1 + 1) / dim(cur, p.m);
+        t += row.value * share; });
+      return t;
+    }
+    var SPF = ['amt','pbAmt','brandAmt','inv','items','qty','projectAmt','projInv','whatsappAmt','waInv','protectionAmt','protectionQty'];
+    var spC = idxCur(D.spFact || [], SPF), spL = idxLy(D.spFact || [], ['amt','pbAmt','brandAmt','projectAmt','whatsappAmt','protectionQty']);
+    var itC = idxCur(D.itemDayFact || [], ['amt','qty']), itL = idxLy(D.itemFact || [], ['amt','qty']);
+
+    /* ---------- ranking (nomor urut saja, dihitung server) ---------- */
+    var RK = {};
+    function loadRank(P){
+      var key = P.s + '|' + P.e, el = function(){ return root.querySelector('#sx-rank'); };
+      if(RK[key]){ paintRank(RK[key]); return; } if(!window.__rank || !P.parts.length) return;
+      window.__rank(P.s, P.e).then(function(j){ RK[key] = j; if(key === curKey) paintRank(j); }).catch(function(){});
+    }
+    var curKey = '';
+    function paintRank(j){ var el = root.querySelector('#sx-rank'), e2 = root.querySelector('#sx-rank2'); if(!el) return; if(j && j.rank){ el.textContent = '#' + j.rank; if(e2) e2.textContent = 'dari ' + j.of + ' · ' + (j.group || ''); } else { el.textContent = '–'; if(e2) e2.textContent = 'belum ada penjualan pada periode ini'; } }
+
+    /* ---------- trend ---------- */
+    function trendPanels(P, getC, getL, title, opt){
+      opt = opt || {}; var h = '', isY = S.per === 'ytd', ms = []; P.parts.forEach(function(p){ if(ms.indexOf(p.m) < 0) ms.push(p.m); });
+      function monthPanel(){
+        var labels = ms.map(function(m){ return MS[m-1]; }), A = [], B = [];
+        ms.forEach(function(m){ var Pm = {parts:[{m:m, d1:1, d2:maxDayOf(m)}]}; A.push(getC(Pm)); B.push(getL(Pm)); });
+        return '<div class="sx-panel"><div class="sx-ph">' + title + ' per Bulan <small>' + esc(periodLabel(P)) + '</small></div>' + legend([[String(cur), C_CUR], [String(ly), C_LY]]) + barChart(labels, [{name:String(ly), color:C_LY, values:B}, {name:String(cur), color:C_CUR, values:A}]) + '</div>';
+      }
+      if(S.per === 'ytd'){
+        h += monthPanel();
+        var qs = [], ql = [], qa = [], qb = []; for(var q = 1; q <= Math.ceil(lm / 3); q++){ var pa = []; for(var m = (q-1)*3+1; m <= Math.min(lm, q*3); m++) pa.push({m:m, d1:1, d2:maxDayOf(m)}); var Pq = {parts:pa}; ql.push('Q' + q); qa.push(getC(Pq)); qb.push(getL(Pq)); }
+        h += '<div class="sx-panel"><div class="sx-ph">' + title + ' per Kuartal <small>' + cur + '</small></div>' + legend([[String(cur), C_CUR], [String(ly), C_LY]]) + barChart(ql, [{name:String(ly), color:C_LY, values:qb}, {name:String(cur), color:C_CUR, values:qa}]) + '</div>';
+      } else if(S.per === 'sem' || S.per === 'q'){ h += monthPanel(); }
+      else {
+        var m0 = S.per === 'month' ? S.month : +S.date.slice(5, 7);
+        if(S.per === 'month' && !S.week){
+          var ws = weeksOf(m0); h += '<div class="sx-panel"><div class="sx-ph">' + title + ' per Minggu <small>' + MN[m0-1] + ' ' + cur + '</small></div>' + barChart(ws.map(function(w){ return 'M' + w.w; }), [{name:'Sales', color:C_CUR, values:ws.map(function(w){ return getC({parts:[{m:m0, d1:w.d1, d2:w.d2}]}); })}]) + '<div class="sx-note">M1 = tgl 1–7, M2 = 8–14, M3 = 15–21, M4 = 22–28, M5 = 29–akhir bulan.</div></div>';
+        }
+        var dA = S.per === 'month' && S.week ? P.parts[0] : {m:m0, d1:1, d2:maxDayOf(m0)}, ds = [], dv = [];
+        for(var d = dA.d1; d <= dA.d2; d++){ ds.push(d); dv.push(getC({parts:[{m:m0, d1:d, d2:d}]})); }
+        h += '<div class="sx-panel"><div class="sx-ph">' + title + ' per Tanggal <small>' + MN[m0-1] + ' ' + cur + (S.per === 'date' ? ' · dipilih: tgl ' + (+S.date.slice(8, 10)) : '') + '</small></div>' + barChart(ds, [{name:'Sales', color:C_CUR, values:dv}]) + '</div>';
+      }
+      return h;
+    }
 
     /* ---------- tab: Sales Saya ---------- */
     function meHtml(){
-      var rows = D.spFact, isDate = S.per === 'date', ms = monthsOf();
-      var A = isDate ? rows.filter(inRange) : sel(rows, cur, ms), B = isDate ? [] : sel(rows, ly, ms);
-      var amt = sum(A, 'amt'), amtLY = sum(B, 'amt'), inv = sum(A, 'inv'), pbA = sum(A, 'pbAmt'), pr = sum(A, 'projectAmt'), wa = sum(A, 'whatsappAmt'), prot = sum(A, 'protectionQty');
+      var P = period(); if(!P.parts.length) return '<div class="sx-panel"><div class="sx-empty">Belum ada data pada periode ini.</div></div>';
+      var c = sumCur(spC, P, SPF), l = sumLy(spL, P, ['amt','pbAmt','brandAmt','projectAmt','whatsappAmt','protectionQty']), bud = budgetOf(P);
+      var amt = c.amt, lyA = l.amt, hasInv = !c.noPI, approx = S.per === 'date' || (S.per === 'month' && S.week);
+      var ach = bud ? amt / bud * 100 : null, g = growth(amt, lyA), brandV = isPB ? c.pbAmt : c.brandAmt, brandL = isPB ? l.pbAmt : l.brandAmt;
+      var brandLbl = isPB ? 'Private Brand' : (U.mb || 'Brand');
+      var inv = c.inv, ipd = c.days ? inv / c.days : null, ipi = inv ? c.items / inv : null, basket = inv ? amt / inv : null;
       var h = '<div class="sx-cards">'
-        + card('Sales Value', fRp(amt), isDate ? periodLabel() : 'vs ' + ly + ': ' + fRp(amtLY) + ' ' + gHtml(growth(amt, amtLY)))
-        + card('Invoice', fN(inv), inv ? 'Rata-rata ' + fRp(amt / inv) + '/invoice' : '')
-        + card('Private Brand', fRp(pbA), amt ? (pbA / amt * 100).toFixed(1).replace('.', ',') + '% dari sales' : '')
-        + card('Sales Project', fRp(pr), 'WhatsApp: ' + fRp(wa))
+        + card('Ranking', '<span id="sx-rank">…</span>', '<span id="sx-rank2">berdasarkan sales value</span>')
+        + card('Actual Sales', fRp(amt), periodLabel(P))
+        + card('Budget', bud == null ? '–' : fRp(bud), bud == null ? 'Budget tidak tersedia untuk zona ini' : 'Budget Salesperson ' + esc(U.zona || ''))
+        + card('Achieve', ach == null ? '–' : '<span style="color:' + (ach >= 100 ? GOOD : BAD) + '">' + pct(ach) + '</span>', 'Actual ÷ Budget')
+        + card('Sales LY', fRp(lyA), String(ly) + (approx ? ' (proporsional dari data bulanan)' : ''))
+        + card('Growth', lyA ? gHtml(g) : '–', 'vs ' + ly)
+        + card('Diff Budget', bud == null ? '–' : dClr(amt - bud, fD(amt - bud)), 'Actual − Budget')
+        + card('Diff Growth', lyA ? dClr(amt - lyA, fD(amt - lyA)) : '–', 'Actual − Sales LY')
+        + (hasBrand ? card('Sales by Brand', fRp(brandV), esc(brandLbl) + (amt ? ' · ' + pct(brandV / amt * 100) + ' dari sales' : '') + (brandL ? '<br>LY: ' + fRp(brandL) + ' ' + gHtml(growth(brandV, brandL)) : '')) : '')
+        + card('Sales Protection', fRp(c.protectionAmt), 'Qty: <b>' + fN(c.protectionQty) + '</b>' + (l.protectionQty ? ' · LY qty ' + fN(l.protectionQty) : ''))
+        + card('Sales Project', fRp(c.projectAmt), 'Invoice: <b>' + (hasInv ? fN(c.projInv) : '–') + '</b>' + (l.projectAmt ? '<br>LY: ' + fRp(l.projectAmt) : ''))
+        + card('Sales WhatsApp', fRp(c.whatsappAmt), 'Invoice: <b>' + (hasInv ? fN(c.waInv) : '–') + '</b>' + (l.whatsappAmt ? '<br>LY: ' + fRp(l.whatsappAmt) : ''))
+        + card('Invoice', fN(inv), 'jumlah nota')
+        + card('IPD', ipd == null ? '–' : ipd.toLocaleString('id-ID', {maximumFractionDigits:1}), 'Invoice per hari (' + fN(c.days) + ' hari ada transaksi)')
+        + card('IPI', ipi == null ? '–' : ipi.toLocaleString('id-ID', {maximumFractionDigits:2}), 'Item per invoice')
+        + card('Basket Size', basket == null ? '–' : fRp(basket), 'Sales ÷ invoice')
         + '</div>';
-      if(prot) h += '<div class="sx-note">Protection: <b>' + fN(prot) + '</b> qty pada periode ini.</div>';
-      // grafik + tabel
-      if(isDate){
-        var byDay = {}; A.forEach(function(r){ var k = String(r.m).padStart(2,'0') + '-' + String(r.d).padStart(2,'0'); (byDay[k] = byDay[k] || {amt:0, inv:0, pb:0}); byDay[k].amt += num(r.amt); byDay[k].inv += num(r.inv); byDay[k].pb += num(r.pbAmt); });
-        var keys = Object.keys(byDay).sort();
-        if(!keys.length) return h + '<div class="sx-panel"><div class="sx-empty">Tidak ada transaksi pada tanggal ini.</div></div>';
-        var showKeys = keys.length > 62 ? null : keys;
-        h += '<div class="sx-panel"><div class="sx-ph">Sales per Hari <small>' + esc(periodLabel()) + '</small></div>' + (showKeys ? barChart(keys.map(function(k){ return +k.slice(3); }), [{name:'Sales', color:C_CUR, values:keys.map(function(k){ return byDay[k].amt; })}]) : '<div class="sx-note">Rentang lebih dari 62 hari — lihat tabel.</div>') + '</div>';
-        h += '<div class="sx-panel"><div class="sx-ph">Rincian Harian</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Tanggal</th><th>Sales</th><th>Invoice</th><th>Private Brand</th></tr></thead><tbody>'
-          + keys.slice().reverse().map(function(k){ var o = byDay[k]; return '<tr><td>' + fDate(cur + '-' + k) + '</td><td>' + fRp(o.amt) + '</td><td>' + fN(o.inv) + '</td><td>' + fRp(o.pb) + '</td></tr>'; }).join('')
-          + '<tr class="tot"><td>Total</td><td>' + fRp(amt) + '</td><td>' + fN(inv) + '</td><td>' + fRp(pbA) + '</td></tr></tbody></table></div></div>';
-        return h;
-      }
-      var cA = ms.map(function(m){ return sum(A.filter(function(r){ return r.m === m; }), 'amt'); }), cB = ms.map(function(m){ return sum(B.filter(function(r){ return r.m === m; }), 'amt'); });
-      h += '<div class="sx-panel"><div class="sx-ph">Sales per Bulan <small>' + esc(periodLabel()) + '</small></div>' + legend([[String(cur), C_CUR], [String(ly), C_LY]]) + barChart(ms.map(function(m){ return MS[m-1]; }), [{name:String(ly), color:C_LY, values:cB}, {name:String(cur), color:C_CUR, values:cA}]) + '</div>';
-      h += '<div class="sx-panel"><div class="sx-ph">Rincian per Bulan</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Bulan</th><th>' + cur + '</th><th>' + ly + '</th><th>Growth</th><th>Invoice</th></tr></thead><tbody>'
-        + ms.map(function(m, i){ var iv = sum(A.filter(function(r){ return r.m === m; }), 'inv'); return '<tr><td>' + MN[m-1] + '</td><td>' + fRp(cA[i]) + '</td><td>' + fRp(cB[i]) + '</td><td>' + gHtml(growth(cA[i], cB[i])) + '</td><td>' + (iv ? fN(iv) : '–') + '</td></tr>'; }).join('')
-        + '<tr class="tot"><td>Total</td><td>' + fRp(amt) + '</td><td>' + fRp(amtLY) + '</td><td>' + gHtml(growth(amt, amtLY)) + '</td><td>' + (inv ? fN(inv) : '–') + '</td></tr></tbody></table></div>'
-        + '<div class="sx-note">Pembanding (' + ly + ') = bulan yang sama tahun lalu. Data invoice tersedia mulai ' + cur + '.</div></div>';
-      return h;
-    }
-
-    var _dc = new Map();
-    function derive(rows){ if(_dc.has(rows)) return _dc.get(rows); var o = rows.map(function(r){ var m = D.itemMeta[r.item] || {}; return {y:r.y, m:r.m, d:r.d, cat:m.cat || '(lainnya)', subcat:m.subcat || '', brand:m.brand || '(lainnya)', mb:m.mb || '', amt:r.amt, qty:r.qty}; }); _dc.set(rows, o); return o; }
-    /* ---------- tab: Master Brand ---------- */
-    function brandHtml(){
-      if(D.brandMode === 'none') return '<div class="sx-panel"><div class="sx-empty">Master brand <b>' + esc(U.mb || '-') + '</b> tidak memiliki data brand di dashboard, sehingga hanya data Sales Anda yang tersedia.</div></div>';
-      var isPB = D.brandMode === 'pb', isDate = S.per === 'date', ms = monthsOf();
-      var title = isPB ? 'Private + Exclusive Brand ' + (U.zona || '') : D.brandNames.join(' + ');
-      var amtF = 'amt', qtyF = 'qty';
-      var monthly = isPB ? derive(D.itemFact) : D.brandFact, daily = isPB ? derive(D.itemDayFact) : D.brandDayFact;
-      var A, B = [];
-      if(isDate) A = daily.filter(inRange); else { A = sel(monthly, cur, ms); B = sel(monthly, ly, ms); }
-      var amt = sum(A, amtF), amtLY = sum(B, amtF), qty = sum(A, qtyF), qtyLY = sum(B, qtyF), hasQty = !isDate || isPB;
-      var h = '<div class="sx-note" style="margin:0 0 8px;">' + (isPB ? 'Penjualan <b>Private Brand + Exclusive Brand</b> (Master Type Brand) pada <b>' + esc(U.zona || '-') + '</b> di seluruh toko, per brand (bukan hanya penjualan Anda).' : 'Penjualan master brand <b>' + esc(title) + '</b> di seluruh toko (bukan hanya penjualan Anda).') + '</div><div class="sx-cards">'
-        + card('Sales ' + esc(title), fRp(amt), isDate ? periodLabel() : 'vs ' + ly + ': ' + fRp(amtLY) + ' ' + gHtml(growth(amt, amtLY)))
-        + (hasQty ? card('Qty', fN(qty), isDate ? '' : 'vs ' + ly + ': ' + fN(qtyLY) + ' ' + gHtml(growth(qty, qtyLY))) : '')
-        + (U.spId && D.spFact ? card('Sales Saya / Brand', amt ? (sum(isDate ? D.spFact.filter(inRange) : sel(D.spFact, cur, ms), 'amt') / amt * 100).toFixed(1).replace('.', ',') + '%' : '–', 'porsi penjualan Anda') : '')
-        + '</div>';
-      if(!A.length) return h + '<div class="sx-panel"><div class="sx-empty">Tidak ada data brand pada periode ini.</div></div>';
-      if(isDate){
-        var byDay = {}; A.forEach(function(r){ var k = String(r.m).padStart(2,'0') + '-' + String(r.d).padStart(2,'0'); byDay[k] = (byDay[k] || 0) + num(r[amtF]); });
-        var keys = Object.keys(byDay).sort();
-        if(keys.length <= 62) h += '<div class="sx-panel"><div class="sx-ph">Sales Brand per Hari <small>' + esc(periodLabel()) + '</small></div>' + barChart(keys.map(function(k){ return +k.slice(3); }), [{name:'Sales', color:C_CUR, values:keys.map(function(k){ return byDay[k]; })}]) + '</div>';
+      if(!hasInv) h += '<div class="sx-note">Sebagian data belum memuat rincian invoice Project/WhatsApp — minta admin mengunggah ulang file penjualan bulan terkait.</div>';
+      if(approx) h += '<div class="sx-note">Sales LY dihitung proporsional jumlah hari dari data bulanan ' + ly + ' (data LY tidak tersedia per tanggal).</div>';
+      // trend
+      var getC = function(Pm){ return sumCur(spC, Pm, ['amt']).amt; }, getL = function(Pm){ return sumLy(spL, Pm, ['amt']).amt; };
+      h += trendPanels(P, getC, getL, 'Sales');
+      // tabel rincian
+      if(S.per === 'ytd' || S.per === 'sem' || S.per === 'q'){
+        var rows = P.parts.map(function(p){ var Pm = {parts:[p]}, cc = sumCur(spC, Pm, SPF), ll = sumLy(spL, Pm, ['amt']), bb = budgetOf(Pm); return '<tr><td>' + MN[p.m-1] + '</td><td>' + fRp(cc.amt) + '</td><td>' + (bb == null ? '–' : fRp(bb)) + '</td><td>' + (bb ? pct(cc.amt / bb * 100) : '–') + '</td><td>' + fRp(ll.amt) + '</td><td>' + gHtml(growth(cc.amt, ll.amt)) + '</td><td>' + fN(cc.inv) + '</td></tr>'; }).join('');
+        h += '<div class="sx-panel"><div class="sx-ph">Rincian per Bulan</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Bulan</th><th>Actual</th><th>Budget</th><th>Achieve</th><th>' + ly + '</th><th>Growth</th><th>Invoice</th></tr></thead><tbody>' + rows
+          + '<tr class="tot"><td>Total</td><td>' + fRp(amt) + '</td><td>' + (bud == null ? '–' : fRp(bud)) + '</td><td>' + (ach == null ? '–' : pct(ach)) + '</td><td>' + fRp(lyA) + '</td><td>' + gHtml(g) + '</td><td>' + fN(inv) + '</td></tr></tbody></table></div></div>';
       } else {
-        var cA = ms.map(function(m){ return sum(A.filter(function(r){ return r.m === m; }), amtF); }), cB = ms.map(function(m){ return sum(B.filter(function(r){ return r.m === m; }), amtF); });
-        h += '<div class="sx-panel"><div class="sx-ph">Sales Brand per Bulan <small>' + esc(periodLabel()) + '</small></div>' + legend([[String(cur), C_CUR], [String(ly), C_LY]]) + barChart(ms.map(function(m){ return MS[m-1]; }), [{name:String(ly), color:C_LY, values:cB}, {name:String(cur), color:C_CUR, values:cA}]) + '</div>';
-      }
-      // per kategori
-      function group(rows, f){ var o = {}; rows.forEach(function(r){ var k = r[f] || '(lainnya)'; o[k] = (o[k] || 0) + num(r[amtF]); }); return o; }
-      var gA = group(A, 'cat'), gB = group(B, 'cat'), cats = Object.keys(gA).sort(function(a, b){ return gA[b] - gA[a]; });
-      h += '<div class="sx-panel"><div class="sx-ph">Per Kategori <small>' + esc(periodLabel()) + '</small></div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Kategori</th><th>Sales</th>' + (isDate ? '<th>Porsi</th>' : '<th>' + ly + '</th><th>Growth</th>') + '</tr></thead><tbody>'
-        + cats.map(function(c){ return '<tr><td>' + esc(c) + '</td><td>' + fRp(gA[c]) + '</td>' + (isDate ? '<td>' + (amt ? (gA[c] / amt * 100).toFixed(1).replace('.', ',') + '%' : '–') + '</td>' : '<td>' + fRp(gB[c] || 0) + '</td><td>' + gHtml(growth(gA[c], gB[c] || 0)) + '</td>') + '</tr>'; }).join('')
-        + '<tr class="tot"><td>Total</td><td>' + fRp(amt) + '</td>' + (isDate ? '<td></td>' : '<td>' + fRp(amtLY) + '</td><td>' + gHtml(growth(amt, amtLY)) + '</td>') + '</tr></tbody></table></div></div>';
-      if(isPB){
-        var bA = {}, bB = {}, bm = {}; A.forEach(function(r){ var k = r.brand; bA[k] = (bA[k] || 0) + num(r.amt); bm[k] = r.mb; }); B.forEach(function(r){ var k = r.brand; bB[k] = (bB[k] || 0) + num(r.amt); });
-        var bl = Object.keys(bA).sort(function(a, b){ return bA[b] - bA[a]; }).slice(0, 25);
-        h += '<div class="sx-panel"><div class="sx-ph">Sales per Brand <small>maks. 25</small></div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Brand</th><th>Sales</th>' + (isDate ? '<th>Porsi</th>' : '<th>' + ly + '</th><th>Growth</th>') + '</tr></thead><tbody>'
-          + bl.map(function(k){ return '<tr><td><b>' + esc(k) + '</b>' + (bm[k] ? '<div style="font-size:11.5px;color:' + SOFT + ';">' + esc(bm[k]) + '</div>' : '') + '</td><td>' + fRp(bA[k]) + '</td>' + (isDate ? '<td>' + (amt ? (bA[k] / amt * 100).toFixed(1).replace('.', ',') + '%' : '–') + '</td>' : '<td>' + fRp(bB[k] || 0) + '</td><td>' + gHtml(growth(bA[k], bB[k] || 0)) + '</td>') + '</tr>'; }).join('') + '</tbody></table></div></div>';
-      }
-      if(!isDate && !isPB){
-        var sA = {}, sB = {}; A.forEach(function(r){ var k = (r.subcat || '(lainnya)'); sA[k] = (sA[k] || 0) + num(r.amt); }); B.forEach(function(r){ var k = (r.subcat || '(lainnya)'); sB[k] = (sB[k] || 0) + num(r.amt); });
-        var subs = Object.keys(sA).sort(function(a, b){ return sA[b] - sA[a]; }).slice(0, 15);
-        h += '<div class="sx-panel"><div class="sx-ph">Top Sub Category <small>maks. 15</small></div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Sub Category</th><th>Sales</th><th>' + ly + '</th><th>Growth</th></tr></thead><tbody>'
-          + subs.map(function(c){ return '<tr><td>' + esc(c) + '</td><td>' + fRp(sA[c]) + '</td><td>' + fRp(sB[c] || 0) + '</td><td>' + gHtml(growth(sA[c], sB[c] || 0)) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
+        var m0 = P.parts[0].m, a = S.per === 'month' && S.week ? P.parts[0] : {d1:1, d2:maxDayOf(m0)}, trs = '';
+        for(var d = a.d1; d <= a.d2; d++){ var cc = sumCur(spC, {parts:[{m:m0, d1:d, d2:d}]}, SPF); if(!cc.amt && !cc.inv) continue; trs = '<tr' + (S.per === 'date' && d === +S.date.slice(8, 10) ? ' class="tot"' : '') + '><td>' + d + ' ' + MS[m0-1] + '</td><td>' + fRp(cc.amt) + '</td><td>' + fN(cc.inv) + '</td><td>' + (cc.inv ? fRp(cc.amt / cc.inv) : '–') + '</td><td>' + fRp(isPB ? cc.pbAmt : cc.brandAmt) + '</td></tr>' + trs; }
+        h += '<div class="sx-panel"><div class="sx-ph">Rincian per Tanggal</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Tanggal</th><th>Sales</th><th>Invoice</th><th>Basket</th><th>' + esc(brandLbl) + '</th></tr></thead><tbody>' + (trs || '<tr><td colspan="5" style="text-align:center;color:' + SOFT + ';">Tidak ada transaksi.</td></tr>') + '</tbody></table></div></div>';
       }
       return h;
     }
 
-
-    /* ---------- tab: Item Detail master brand ---------- */
-    function itemRows(){
-      var isDate = S.per === 'date', ms = isDate ? null : monthsOf(), A = {}, B = {};
-      if(isDate) D.itemDayFact.forEach(function(r){ if(inRange(r)){ var o = A[r.item] || (A[r.item] = {amt:0, qty:0}); o.amt += num(r.amt); o.qty += num(r.qty); } });
-      else D.itemFact.forEach(function(r){
-        var inM = ms.indexOf(r.m) >= 0; if(r.y === cur && inM){ var o = A[r.item] || (A[r.item] = {amt:0, qty:0}); o.amt += num(r.amt); o.qty += num(r.qty); } else if(r.y === ly && inM){ var p = B[r.item] || (B[r.item] = {amt:0, qty:0}); p.amt += num(r.amt); p.qty += num(r.qty); }
-      });
-      var ids = {}; Object.keys(A).forEach(function(k){ ids[k] = 1; }); Object.keys(B).forEach(function(k){ ids[k] = 1; });
-      return Object.keys(ids).map(function(id){ var m = D.itemMeta[id] || {}, a = A[id] || {amt:0, qty:0}, b = B[id] || {amt:0, qty:0}; return {id:id, name:m.name || id, cat:m.cat || '', sub:m.subcat || '', brand:m.brand || '', amt:a.amt, qty:a.qty, lyAmt:b.amt, lyQty:b.qty, g:growth(a.amt, b.amt)}; });
+    /* ---------- master brand: agregasi item ---------- */
+    function itemAgg(P){
+      var A = {}, B = {};
+      (D.itemDayFact || []).forEach(function(r){ if(r.y !== cur) return; var inP = P.parts.some(function(p){ return r.m === p.m && r.d >= p.d1 && r.d <= p.d2; }); if(!inP) return; var o = A[r.item] || (A[r.item] = {amt:0, qty:0}); o.amt += num(r.amt); o.qty += num(r.qty); });
+      (D.itemFact || []).forEach(function(r){ if(r.y !== ly) return; var wgt = 0; P.parts.forEach(function(p){ if(p.m === r.m) wgt = lyW(p); }); if(!wgt) return; var o = B[r.item] || (B[r.item] = {amt:0, qty:0}); o.amt += num(r.amt) * wgt; o.qty += num(r.qty) * wgt; });
+      return {A:A, B:B};
     }
+    function itemRows(P){
+      var ag = itemAgg(P), ids = {}; Object.keys(D.itemMeta).forEach(function(k){ ids[k] = 1; });
+      return Object.keys(ids).map(function(id){ var m = D.itemMeta[id] || {}, a = ag.A[id] || {amt:0, qty:0}, b = ag.B[id] || {amt:0, qty:0};
+        return {id:id, name:m.name || id, cat:m.cat || '(lainnya)', sub:m.subcat || '', brand:m.brand || '(lainnya)', cls:m.cls || '', amt:a.amt, qty:a.qty, lyAmt:b.amt, lyQty:b.qty, sv:num(m.sv), sq:num(m.sq), dc:num(m.dc), g:growth(a.amt, b.amt), dg:a.amt - b.amt}; });
+    }
+    function tri(v, q){ return fRp(v) + '<small>qty ' + fN(q) + (q ? ' · avg ' + fRp(v / q) : '') + '</small>'; }
+    function brandHtml(){
+      if(!hasBrand) return '<div class="sx-panel"><div class="sx-empty">Master brand <b>' + esc(U.mb || '-') + '</b> tidak memiliki data penjualan item di dashboard, sehingga hanya data Sales Anda yang tersedia.</div></div>';
+      var P = period(); if(!P.parts.length) return '<div class="sx-panel"><div class="sx-empty">Belum ada data pada periode ini.</div></div>';
+      var rows = itemRows(P), tot = {amt:0, qty:0, lyAmt:0, lyQty:0, sv:0, sq:0, dc:0}; rows.forEach(function(r){ for(var k in tot) tot[k] += r[k]; });
+      var bud = budgetOf(P, isPB ? (D.brandBudget || []) : null), ach = bud ? tot.amt / bud * 100 : null, approx = S.per === 'date' || (S.per === 'month' && S.week);
+      var title = isPB ? 'Private + Exclusive Brand ' + (U.zona || '') : (U.mb || '');
+      var h = '<div class="sx-note" style="margin:0 0 8px;">' + (isPB ? 'Penjualan <b>Private Brand + Exclusive Brand</b> (Master Type Brand) pada <b>' + esc(U.zona || '-') + '</b> di seluruh toko.' : 'Penjualan master brand <b>' + esc(title) + '</b> di seluruh toko (bukan hanya penjualan Anda).') + ' · ' + esc(periodLabel(P)) + '</div><div class="sx-cards">'
+        + card('Budget', bud == null ? '–' : fRp(bud), bud == null ? 'Budget tidak tersedia' : (isPB ? 'Budget Private Brand ' : 'Budget Salesperson ') + esc(U.zona || ''))
+        + card('Actual', fRp(tot.amt), 'Qty: <b>' + fN(tot.qty) + '</b><br>Rata-rata/item: <b>' + (tot.qty ? fRp(tot.amt / tot.qty) : '–') + '</b>')
+        + card('Sales LY', fRp(tot.lyAmt), 'Qty: <b>' + fN(tot.lyQty) + '</b><br>Rata-rata/item: <b>' + (tot.lyQty ? fRp(tot.lyAmt / tot.lyQty) : '–') + '</b>')
+        + card('Achieve', ach == null ? '–' : '<span style="color:' + (ach >= 100 ? GOOD : BAD) + '">' + pct(ach) + '</span>', 'Actual ÷ Budget')
+        + card('Growth', tot.lyAmt ? gHtml(growth(tot.amt, tot.lyAmt)) : '–', 'vs ' + ly)
+        + card('Diff Budget', bud == null ? '–' : dClr(tot.amt - bud, fD(tot.amt - bud)), 'Actual − Budget')
+        + card('Diff Growth', tot.lyAmt ? dClr(tot.amt - tot.lyAmt, fD(tot.amt - tot.lyAmt)) : '–', 'Actual − Sales LY')
+        + card('Inventory Value', fRp(tot.sv), 'Qty toko: <b>' + fN(tot.sq) + '</b> · Stok DC: <b>' + fN(tot.dc) + '</b>' + (D.stock && D.stock.date ? '<br>per ' + esc(fDate(D.stock.date)) : ''))
+        + '</div>';
+      if(approx) h += '<div class="sx-note">Sales LY dihitung proporsional jumlah hari dari data bulanan ' + ly + '. Inventory adalah posisi stok terakhir (tidak berubah menurut periode).</div>';
+      // trend: jumlahkan seluruh item
+      var dayIx = idxCur(D.itemDayFact || [], ['amt']), lyIx = idxLy(D.itemFact || [], ['amt']);
+      h += trendPanels(P, function(Pm){ return sumCur(dayIx, Pm, ['amt']).amt; }, function(Pm){ return sumLy(lyIx, Pm, ['amt']).amt; }, 'Sales Brand');
+      function grpTable(key, label, limit){
+        var g = {}; rows.forEach(function(r){ var k = r[key]; var o = g[k] || (g[k] = {k:k, amt:0, qty:0, lyAmt:0, lyQty:0, sv:0, sq:0, dc:0}); for(var f in tot) o[f] += r[f]; });
+        var list = Object.keys(g).map(function(k){ return g[k]; }).filter(function(o){ return o.amt || o.lyAmt || o.sv; }).sort(function(a, b){ return b.amt - a.amt; });
+        var shown = list.slice(0, limit);
+        return '<div class="sx-panel"><div class="sx-ph">Sales per ' + label + ' <small>' + list.length + ' ' + label.toLowerCase() + (list.length > limit ? ' · tampil ' + limit + ' teratas' : '') + '</small></div><div class="sx-tw"><table class="sx-t"><thead><tr><th>' + label + '</th><th>Actual</th><th>Sales LY</th><th>Growth</th><th>Diff Growth</th><th>Inventory</th></tr></thead><tbody>'
+          + shown.map(function(o){ return '<tr><td><b>' + esc(o.k) + '</b></td><td>' + tri(o.amt, o.qty) + '</td><td>' + (approx ? '≈ ' : '') + tri(o.lyAmt, o.lyQty) + '</td><td>' + (o.lyAmt ? gHtml(growth(o.amt, o.lyAmt)) : '–') + '</td><td>' + dClr(o.amt - o.lyAmt, fD(o.amt - o.lyAmt)) + '</td><td>' + fRp(o.sv) + '<small>qty ' + fN(o.sq) + ' · DC ' + fN(o.dc) + '</small></td></tr>'; }).join('')
+          + '<tr class="tot"><td>Total</td><td>' + tri(tot.amt, tot.qty) + '</td><td>' + tri(tot.lyAmt, tot.lyQty) + '</td><td>' + (tot.lyAmt ? gHtml(growth(tot.amt, tot.lyAmt)) : '–') + '</td><td>' + dClr(tot.amt - tot.lyAmt, fD(tot.amt - tot.lyAmt)) + '</td><td>' + fRp(tot.sv) + '<small>qty ' + fN(tot.sq) + ' · DC ' + fN(tot.dc) + '</small></td></tr></tbody></table></div>'
+          + (key === 'cat' ? '<div class="sx-note">Budget hanya tersedia di level Salesperson / Master Brand (lihat kartu di atas), tidak per kategori maupun brand.</div>' : '') + '</div>';
+      }
+      return h + grpTable('cat', 'Kategori', 30) + grpTable('brand', 'Brand', 30);
+    }
+
+    /* ---------- tab: Item Detail ---------- */
     function itemHtml(){
-      if(D.brandMode !== 'brand' && D.brandMode !== 'pb') return '<div class="sx-panel"><div class="sx-empty">Detail item tidak tersedia untuk master brand <b>' + esc(U.mb || '-') + '</b>.</div></div>';
-      var isDate = S.per === 'date', all = itemRows(), cats = {}; all.forEach(function(r){ if(r.cat) cats[r.cat] = 1; });
-      var tot = {amt:0, qty:0, ly:0}; all.forEach(function(r){ tot.amt += r.amt; tot.qty += r.qty; tot.ly += r.lyAmt; });
-      var h = '<div class="sx-note" style="margin:0 0 8px;">Penjualan item ' + (D.brandMode === 'pb' ? '<b>Private + Exclusive Brand ' + esc(U.zona || '') + '</b>' : 'master brand <b>' + esc(D.brandNames.join(' + ')) + '</b>') + ' di seluruh toko · ' + esc(periodLabel()) + '</div>'
-        + '<div class="sx-cards">' + card('Item Terjual', fN(all.filter(function(r){ return r.amt || r.qty; }).length), 'dari ' + fN(Object.keys(D.itemMeta).length) + ' item') + card('Sales', fRp(tot.amt), isDate ? '' : 'vs ' + ly + ': ' + fRp(tot.ly) + ' ' + gHtml(growth(tot.amt, tot.ly))) + card('Qty', fN(tot.qty), '') + '</div>'
+      if(!hasBrand) return '<div class="sx-panel"><div class="sx-empty">Detail item tidak tersedia untuk master brand <b>' + esc(U.mb || '-') + '</b>.</div></div>';
+      var P = period(); if(!P.parts.length) return '<div class="sx-panel"><div class="sx-empty">Belum ada data pada periode ini.</div></div>';
+      var all = itemRows(P), cats = {}, clss = {}; all.forEach(function(r){ cats[r.cat] = 1; if(r.cls) clss[r.cls] = 1; });
+      var tot = {amt:0, qty:0, lyAmt:0, sv:0, sq:0, dc:0}; all.forEach(function(r){ for(var k in tot) tot[k] += r[k]; });
+      var sold = all.filter(function(r){ return r.amt || r.qty; }).length, approx = S.per === 'date' || (S.per === 'month' && S.week);
+      var h = '<div class="sx-note" style="margin:0 0 8px;">Penjualan item ' + (isPB ? '<b>Private + Exclusive Brand ' + esc(U.zona || '') + '</b>' : 'master brand <b>' + esc(U.mb || '') + '</b>') + ' di seluruh toko · ' + esc(periodLabel(P)) + '</div>'
+        + '<div class="sx-cards w3">' + card('Item Terjual', fN(sold), 'dari ' + fN(all.length) + ' item terdaftar') + card('Sales', fRp(tot.amt), 'vs ' + ly + ': ' + fRp(tot.lyAmt) + ' ' + gHtml(growth(tot.amt, tot.lyAmt))) + card('Inventory Toko', fRp(tot.sv), 'Qty ' + fN(tot.sq) + ' · Stok DC ' + fN(tot.dc)) + '</div>'
         + '<div class="sx-panel"><div class="sx-ph">Detail Item <small id="sx-itcount"></small></div>'
         + '<input class="sx-find" id="sx-find" type="search" placeholder="Cari kode / nama item…" value="' + esc(S.find) + '">'
-        + '<div class="sx-sub" style="margin:0 0 8px;"><select id="sx-cat"><option value="">Semua kategori</option>' + Object.keys(cats).sort().map(function(c){ return '<option value="' + esc(c) + '"' + (S.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>'
-        + '<select id="sx-sort"><option value="amt"' + (S.sort === 'amt' ? ' selected' : '') + '>Urut: Sales terbesar</option><option value="qty"' + (S.sort === 'qty' ? ' selected' : '') + '>Urut: Qty terbesar</option><option value="g"' + (S.sort === 'g' ? ' selected' : '') + '>Urut: Growth tertinggi</option><option value="gl"' + (S.sort === 'gl' ? ' selected' : '') + '>Urut: Growth terendah</option></select></div>'
-        + '<div class="sx-tw"><table class="sx-t"><thead><tr><th>Item</th><th>Sales</th><th>Qty</th>' + (isDate ? '' : '<th>' + ly + '</th><th>Growth</th>') + '</tr></thead><tbody id="sx-itbody"></tbody></table></div><div id="sx-itmore"></div>'
-        + '<div class="sx-note">' + (isDate ? 'Pembanding tahun lalu tidak tersedia untuk filter tanggal. ' : 'Pembanding (' + ly + ') = bulan yang sama tahun lalu. ') + 'Item tanpa penjualan pada periode ini tidak ditampilkan.</div></div>';
-      setTimeout(function(){ fillItems(all); var f = root.querySelector('#sx-find'), c = root.querySelector('#sx-cat'), so = root.querySelector('#sx-sort');
-        if(f) f.oninput = function(){ S.find = f.value; S.limit = 50; fillItems(all); };
-        if(c) c.onchange = function(){ S.cat = c.value; S.limit = 50; fillItems(all); };
-        if(so) so.onchange = function(){ S.sort = so.value; S.limit = 50; fillItems(all); }; }, 0);
+        + '<div class="sx-sub" style="margin:0 0 8px;"><select class="sx-sel" id="sx-cat"><option value="">Semua kategori</option>' + Object.keys(cats).sort().map(function(c){ return '<option value="' + esc(c) + '"' + (S.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>'
+        + '<select class="sx-sel" id="sx-cls"><option value="">Semua class</option>' + Object.keys(clss).sort().map(function(c){ return '<option value="' + esc(c) + '"' + (S.cls === c ? ' selected' : '') + '>Class ' + esc(c) + '</option>'; }).join('') + '</select>'
+        + '<select class="sx-sel" id="sx-show"><option value="sold"' + (S.show === 'sold' ? ' selected' : '') + '>Terjual pada periode</option><option value="stock"' + (S.show === 'stock' ? ' selected' : '') + '>Ada stok</option><option value="all"' + (S.show === 'all' ? ' selected' : '') + '>Semua item</option></select>'
+        + '<select class="sx-sel" id="sx-sort">' + [['amt','Sales terbesar'],['qty','Qty terbesar'],['g','Growth tertinggi'],['gl','Growth terendah'],['dg','Diff Growth terbesar'],['dgl','Diff Growth terkecil'],['sv','Inventory value terbesar']].map(function(o){ return '<option value="' + o[0] + '"' + (S.sort === o[0] ? ' selected' : '') + '>Urut: ' + o[1] + '</option>'; }).join('') + '</select></div>'
+        + '<div class="sx-tw"><table class="sx-t"><thead><tr><th>Item</th><th>Class</th><th>Sales</th><th>' + ly + '</th><th>Growth</th><th>Diff Growth</th><th>Stok Toko</th><th>Stok DC</th></tr></thead><tbody id="sx-itbody"></tbody></table></div><div id="sx-itmore"></div>'
+        + '<div class="sx-note">' + (approx ? 'Pembanding ' + ly + ' dihitung proporsional dari data bulanan. ' : 'Pembanding (' + ly + ') = bulan yang sama tahun lalu. ') + 'Stok = posisi terakhir' + (D.stock && D.stock.date ? ' (' + esc(fDate(D.stock.date)) + ')' : '') + '; Class item dari laporan stok (kosong bila belum diklasifikasi).</div></div>';
+      setTimeout(function(){ fillItems(all, approx); var f = root.querySelector('#sx-find');
+        if(f) f.oninput = function(){ S.find = f.value; S.limit = 50; fillItems(all, approx); };
+        [['#sx-cat','cat'],['#sx-cls','cls'],['#sx-show','show'],['#sx-sort','sort']].forEach(function(x){ var el = root.querySelector(x[0]); if(el) el.onchange = function(){ S[x[1]] = el.value; S.limit = 50; fillItems(all, approx); }; }); }, 0);
       return h;
     }
-    function fillItems(all){
-      var q = S.find.trim().toLowerCase(), rows = all.filter(function(r){ return (r.amt || r.qty) && (!S.cat || r.cat === S.cat) && (!q || r.id.toLowerCase().indexOf(q) >= 0 || r.name.toLowerCase().indexOf(q) >= 0); });
-      var key = S.sort; rows.sort(function(a, b){ if(key === 'g') return (b.g == null ? -1e9 : b.g) - (a.g == null ? -1e9 : a.g); if(key === 'gl') return (a.g == null ? 1e9 : a.g) - (b.g == null ? 1e9 : b.g); return b[key] - a[key]; });
+    function fillItems(all, approx){
+      var q = S.find.trim().toLowerCase(), rows = all.filter(function(r){
+        var ok = S.show === 'all' ? true : S.show === 'stock' ? (r.sv || r.sq) : (r.amt || r.qty);
+        return ok && (!S.cat || r.cat === S.cat) && (!S.cls || r.cls === S.cls) && (!q || r.id.toLowerCase().indexOf(q) >= 0 || r.name.toLowerCase().indexOf(q) >= 0); });
+      var key = S.sort; rows.sort(function(a, b){ if(key === 'g') return (b.g == null ? -1e9 : b.g) - (a.g == null ? -1e9 : a.g); if(key === 'gl') return (a.g == null ? 1e9 : a.g) - (b.g == null ? 1e9 : b.g); if(key === 'dg') return b.dg - a.dg; if(key === 'dgl') return a.dg - b.dg; return b[key] - a[key]; });
       var tb = root.querySelector('#sx-itbody'), cnt = root.querySelector('#sx-itcount'), more = root.querySelector('#sx-itmore'); if(!tb) return;
-      tb.innerHTML = rows.slice(0, S.limit).map(function(r){ return '<tr><td><b>' + esc(r.name) + '</b><div style="font-size:11.5px;color:' + SOFT + ';">' + esc(r.id) + (r.sub ? ' · ' + esc(r.sub) : '') + '</div></td><td>' + fRp(r.amt) + '</td><td>' + fN(r.qty) + '</td>' + (S.per === 'date' ? '' : '<td>' + fRp(r.lyAmt) + '</td><td>' + gHtml(r.g) + '</td>') + '</tr>'; }).join('') || '<tr><td colspan="5" style="text-align:center;color:' + SOFT + ';padding:18px;">Tidak ada item.</td></tr>';
+      tb.innerHTML = rows.slice(0, S.limit).map(function(r){ return '<tr><td><b>' + esc(r.name) + '</b><small>' + esc(r.id) + (r.sub ? ' · ' + esc(r.sub) : '') + ' · ' + esc(r.brand) + '</small></td><td>' + (r.cls ? esc(r.cls) : '–') + '</td><td>' + fRp(r.amt) + '<small>qty ' + fN(r.qty) + '</small></td><td>' + (approx ? '≈ ' : '') + fRp(r.lyAmt) + '<small>qty ' + fN(r.lyQty) + '</small></td><td>' + (r.lyAmt ? gHtml(r.g) : '–') + '</td><td>' + (r.amt || r.lyAmt ? dClr(r.dg, fD(r.dg)) : '–') + '</td><td>' + fRp(r.sv) + '<small>qty ' + fN(r.sq) + '</small></td><td>' + fN(r.dc) + '</td></tr>'; }).join('') || '<tr><td colspan="8" style="text-align:center;color:' + SOFT + ';">Tidak ada item.</td></tr>';
       if(cnt) cnt.textContent = fN(Math.min(S.limit, rows.length)) + ' dari ' + fN(rows.length) + ' item';
-      if(more){ more.innerHTML = rows.length > S.limit ? '<button class="sx-more">Tampilkan 50 lagi</button>' : ''; var bt = more.querySelector('button'); if(bt) bt.onclick = function(){ S.limit += 50; fillItems(all); }; }
+      if(more){ more.innerHTML = rows.length > S.limit ? '<button class="sx-more">Tampilkan 50 lagi</button>' : ''; var bt = more.querySelector('button'); if(bt) bt.onclick = function(){ S.limit += 50; fillItems(all, approx); }; }
     }
 
-    function controls(){
+    /* ---------- kontrol periode ---------- */
+    function controls(P){
       var seg = [['ytd','YTD'],['sem','Semester'],['q','Kuartal'],['month','Bulan'],['date','Tanggal']];
       var h = '<div class="sx-seg">' + seg.map(function(s){ return '<button data-per="' + s[0] + '" class="' + (S.per === s[0] ? 'on' : '') + '">' + s[1] + '</button>'; }).join('') + '</div><div class="sx-sub">';
-      if(S.per === 'sem') h += '<select id="sx-sem"><option value="1"' + (S.sem === 1 ? ' selected' : '') + '>Semester 1 (Jan–Jun)</option>' + (latestM > 6 ? '<option value="2"' + (S.sem === 2 ? ' selected' : '') + '>Semester 2 (Jul–Des)</option>' : '') + '</select>';
-      if(S.per === 'q'){ h += '<select id="sx-q">'; for(var q = 1; q <= Math.ceil(latestM / 3); q++) h += '<option value="' + q + '"' + (S.q === q ? ' selected' : '') + '>Kuartal ' + q + '</option>'; h += '</select>'; }
-      if(S.per === 'month'){ h += '<select id="sx-m">'; for(var m = 1; m <= latestM; m++) h += '<option value="' + m + '"' + (S.month === m ? ' selected' : '') + '>' + MN[m-1] + '</option>'; h += '</select>'; }
-      if(S.per === 'date') h += '<label>Dari <input type="date" id="sx-from" min="' + dFrom + '" max="' + dTo + '" value="' + S.from + '"></label><label>s/d <input type="date" id="sx-to" min="' + dFrom + '" max="' + dTo + '" value="' + S.to + '"></label>';
-      h += '<span style="color:' + SOFT + ';font-size:12.5px;">' + esc(periodLabel()) + '</span></div>';
+      if(S.per === 'sem') h += '<select id="sx-sem"><option value="1"' + (S.sem === 1 ? ' selected' : '') + '>Semester 1 (Jan–Jun)</option>' + (lm > 6 ? '<option value="2"' + (S.sem === 2 ? ' selected' : '') + '>Semester 2 (Jul–Des)</option>' : '') + '</select>';
+      if(S.per === 'q'){ h += '<select id="sx-q">'; for(var q = 1; q <= Math.ceil(lm / 3); q++) h += '<option value="' + q + '"' + (S.q === q ? ' selected' : '') + '>Kuartal ' + q + '</option>'; h += '</select>'; }
+      if(S.per === 'month'){ h += '<select id="sx-m">'; for(var m = 1; m <= lm; m++) h += '<option value="' + m + '"' + (S.month === m ? ' selected' : '') + '>' + MN[m-1] + '</option>'; h += '</select>'; }
+      if(S.per === 'date') h += '<input type="date" id="sx-date" min="' + firstD + '" max="' + latestD + '" value="' + S.date + '">';
+      h += '<span style="color:' + SOFT + ';font-size:12.5px;">' + esc(periodLabel(P)) + '</span></div>';
+      if(S.per === 'month'){ var ws = weeksOf(S.month); h += '<div class="sx-wk"><button data-wk="0" class="' + (!S.week ? 'on' : '') + '">Semua minggu</button>' + ws.map(function(w){ return '<button data-wk="' + w.w + '" class="' + (S.week === w.w ? 'on' : '') + '">Minggu ' + w.w + '</button>'; }).join('') + '</div>'; }
       return h;
     }
 
     function draw(){
       try{ sessionStorage.setItem('sx_state', JSON.stringify(S)); }catch(e){}
+      if(S.per === 'month' && S.week && weeksOf(S.month).every(function(w){ return w.w !== S.week; })) S.week = 0;
+      var P = period(); curKey = P.s + '|' + P.e;
+      var body; try{ body = S.tab === 'me' ? meHtml() : S.tab === 'item' && hasBrand ? itemHtml() : brandHtml(); }catch(ex){ body = '<div class="sx-panel"><div class="sx-empty">Terjadi kesalahan menampilkan data. Muat ulang halaman.</div></div>'; if(window.console) console.error(ex); }
       root.innerHTML = '<div class="sx-top"><div class="sx-top-in"><div class="sx-row"><div><div class="sx-name">' + esc(U.name) + '</div><div class="sx-id">' + esc(U.spId) + ' · Mitra10 Yogyakarta</div></div><button class="sx-out" id="sx-out">Keluar</button></div>'
-        + '<div class="sx-chips">' + (U.zona ? '<span class="sx-chip">Zona: <b>' + esc(U.zona) + '</b></span>' : '') + '<span class="sx-chip">Master Brand: <b>' + esc(U.mb || '-') + '</b></span>' + (U.tl ? '<span class="sx-chip">TL: <b>' + esc(U.tl) + '</b></span>' : '') + '<span class="sx-chip">Data s/d <b>' + esc(fDate(dTo)) + '</b></span></div></div></div>'
-        + '<div class="sx-bar"><div class="sx-wrap" style="padding:0;">' + controls() + '</div></div>'
-        + '<div class="sx-wrap"><div class="sx-tabs"><button data-tab="me" class="' + (S.tab === 'me' ? 'on' : '') + '">Sales Saya</button><button data-tab="brand" class="' + (S.tab === 'brand' ? 'on' : '') + '">Master Brand' + '</button>' + ((D.brandMode === 'brand' || D.brandMode === 'pb') ? '<button data-tab="item" class="' + (S.tab === 'item' ? 'on' : '') + '">Item Detail</button>' : '') + '</div>'
-        + (S.tab === 'me' ? meHtml() : S.tab === 'item' && (D.brandMode === 'brand' || D.brandMode === 'pb') ? itemHtml() : brandHtml()) + '<div class="sx-note" style="text-align:center;margin-top:18px;">Anda hanya dapat melihat data Sales Anda dan master brand Anda.</div></div>';
+        + '<div class="sx-chips">' + (U.zona ? '<span class="sx-chip">Zona: <b>' + esc(U.zona) + '</b></span>' : '') + '<span class="sx-chip">Master Brand: <b>' + esc(U.mb || '-') + '</b></span>' + (U.tl ? '<span class="sx-chip">TL: <b>' + esc(U.tl) + '</b></span>' : '') + '<span class="sx-chip">Data s/d <b>' + esc(fDate(latestD)) + '</b></span></div></div></div>'
+        + '<div class="sx-bar"><div class="sx-wrap" style="padding:0;">' + controls(P) + '</div></div>'
+        + '<div class="sx-wrap"><div class="sx-tabs"><button data-tab="me" class="' + (S.tab === 'me' ? 'on' : '') + '">Sales Saya</button><button data-tab="brand" class="' + (S.tab === 'brand' ? 'on' : '') + '">Master Brand</button>' + (hasBrand ? '<button data-tab="item" class="' + (S.tab === 'item' ? 'on' : '') + '">Item Detail</button>' : '') + '</div>'
+        + body + '<div class="sx-note" style="text-align:center;margin-top:18px;">Anda hanya dapat melihat data Sales Anda dan master brand Anda.</div></div>';
       root.querySelector('#sx-out').onclick = onLogout;
-      root.querySelectorAll('[data-per]').forEach(function(b){ b.onclick = function(){ S.per = b.dataset.per; draw(); }; });
+      root.querySelectorAll('[data-per]').forEach(function(b){ b.onclick = function(){ S.per = b.dataset.per; S.week = 0; S.limit = 50; draw(); }; });
+      root.querySelectorAll('[data-wk]').forEach(function(b){ b.onclick = function(){ S.week = +b.dataset.wk; draw(); }; });
       root.querySelectorAll('[data-tab]').forEach(function(b){ b.onclick = function(){ S.tab = b.dataset.tab; draw(); window.scrollTo(0, 0); }; });
-      function bind(id, key){ var el = root.querySelector(id); if(el) el.onchange = function(){ S[key] = +el.value; draw(); }; }
+      function bind(id, key){ var el = root.querySelector(id); if(el) el.onchange = function(){ S[key] = +el.value; S.week = 0; draw(); }; }
       bind('#sx-sem', 'sem'); bind('#sx-q', 'q'); bind('#sx-m', 'month');
-      var f = root.querySelector('#sx-from'), t = root.querySelector('#sx-to');
-      if(f && t){ f.onchange = function(){ if(f.value){ S.from = f.value; if(S.to < S.from) S.to = S.from; draw(); } }; t.onchange = function(){ if(t.value){ S.to = t.value; if(S.from > S.to) S.from = S.to; draw(); } }; }
+      var dt = root.querySelector('#sx-date'); if(dt) dt.onchange = function(){ if(dt.value && dt.value >= firstD && dt.value <= latestD){ S.date = dt.value; draw(); } };
+      if(S.tab === 'me') loadRank(P);
     }
     draw();
   };
@@ -666,13 +753,14 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       var old = document.getElementById('site-login'); if(old) old.remove();
       var d = document.createElement('div'); d.id = 'site-login';
       d.style.cssText = 'position:fixed;inset:0;z-index:100000;background:#17262E;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;font-family:system-ui,-apple-system,sans-serif;';
-      var mode = 'login', who = 'user';
+      var mode = 'login', who = 'user', kind = 'sales';
       function draw(msg, ok){
         d.innerHTML = '<form style="background:#fff;border-radius:14px;padding:26px 24px;width:100%;max-width:370px;box-shadow:0 20px 60px rgba(0,0,0,.4);">'
           + '<div style="font-weight:800;font-size:17px;color:#17262E;">PERFORMANCE DASHBOARD</div><div style="font-size:12.5px;color:#6b6f6a;margin:2px 0 6px;">Mitra10 Yogyakarta</div>'
           + (mode === 'login' ? '<div style="display:flex;gap:6px;margin:12px 0 2px;"><button type="button" data-who="user" style="flex:1;padding:9px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;cursor:pointer;background:' + (who==='user' ? '#17262E;color:#fff' : '#fff;color:#444') + ';">Pengguna</button><button type="button" data-who="admin" style="flex:1;padding:9px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;cursor:pointer;background:' + (who==='admin' ? '#D9720B;color:#241500' : '#fff;color:#444') + ';">Admin</button></div>' : '')
-          + (mode === 'req' ? '<label style="'+LB+'">Nama <span style="font-weight:500;color:#777;">(cukup salah satu kata dari nama Anda)</span></label><input id="site-name" autocomplete="name" placeholder="mis. Satriyo" style="'+IN+'">' : '')
-          + '<label style="'+LB+'">' + (mode === 'req' ? 'Salesperson ID <span style="font-weight:500;color:#777;">(wajib)</span>' : 'User / Salesperson ID') + '</label><input id="site-user-in" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="' + (mode === 'req' ? 'S80000-0000000449' : '') + '" style="'+IN+'">'
+          + (mode === 'req' ? '<label style="'+LB+'">Kriteria akses</label><div style="display:flex;gap:6px;margin-top:6px;">' + [['manager','Manager'],['tl','Team Leader'],['sales','Sales']].map(function(k){ return '<button type="button" data-kind="' + k[0] + '" style="flex:1;padding:10px 4px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;font-size:13px;cursor:pointer;background:' + (kind === k[0] ? '#17262E;color:#fff' : '#fff;color:#444') + ';">' + k[1] + '</button>'; }).join('') + '</div><div style="font-size:11.5px;color:#6b6f6a;margin-top:6px;line-height:1.45;">' + (kind === 'manager' ? 'Semua menu termasuk Upload Data &amp; Data Customer (kecuali Kelola Pengguna).' : kind === 'tl' ? 'Semua menu kecuali Data Customer &amp; Upload Data (admin dapat menaikkan ke Admin).' : 'Hanya data penjualan Anda sendiri, master brand &amp; item master brand Anda.') + ' Perlu persetujuan admin utama.</div>' : '')
+          + (mode === 'req' ? '<label style="'+LB+'">' + (kind === 'sales' ? 'Nama <span style="font-weight:500;color:#777;">(cukup salah satu kata dari nama Anda di database Salesperson)</span>' : 'Nama lengkap') + '</label><input id="site-name" autocomplete="name" placeholder="' + (kind === 'sales' ? 'mis. Satriyo' : 'mis. Hasbi Ahmad Wahyudi') + '" style="'+IN+'">' : '')
+          + '<label style="'+LB+'">' + (mode === 'req' ? (kind === 'sales' ? 'Salesperson ID <span style="font-weight:500;color:#777;">(wajib)</span>' : 'User <span style="font-weight:500;color:#777;">(email / username pilihan Anda)</span>') : 'User / Salesperson ID') + '</label><input id="site-user-in" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="' + (mode === 'req' ? (kind === 'sales' ? 'S80000-0000000449' : 'nama.anda@gmail.com') : '') + '" style="'+IN+'">'
           + '<label style="'+LB+'">Password' + (mode === 'req' ? ' (min. 8 karakter)' : '') + '</label><input id="site-pw" type="password" autocomplete="' + (mode === 'req' ? 'new-password' : 'current-password') + '" style="'+IN+'">'
           + '<div id="site-err" style="color:' + (ok ? '#1B7F4B' : '#B23A2E') + ';font-size:12.5px;min-height:18px;margin-top:8px;">' + (msg || '') + '</div>'
           + '<button type="submit" style="width:100%;margin-top:6px;padding:12px;border:0;border-radius:9px;background:#D9720B;color:#241500;font-weight:800;font-size:15px;cursor:pointer;">' + (mode === 'req' ? 'Kirim Permintaan Akses' : 'Masuk') + '</button>'
@@ -680,10 +768,11 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         var f = d.querySelector('form'), err = d.querySelector('#site-err');
         setTimeout(function(){ (d.querySelector('#site-name') || d.querySelector('#site-user-in')).focus(); }, 50);
         var tg = d.querySelector('#site-toggle'); if(tg) tg.onclick = function(){ mode = mode === 'req' ? 'login' : 'req'; draw(''); };
+        d.querySelectorAll('[data-kind]').forEach(function(bn){ bn.onclick = function(){ var u0 = d.querySelector('#site-user-in').value, n0 = d.querySelector('#site-name').value, p0 = d.querySelector('#site-pw').value; kind = bn.dataset.kind; draw(''); d.querySelector('#site-name').value = n0; d.querySelector('#site-pw').value = p0; if(!(/^s\d{5}-/i.test(u0)) || kind === 'sales') d.querySelector('#site-user-in').value = u0; }; });
         d.querySelectorAll('[data-who]').forEach(function(bn){ bn.onclick = function(){ var u0 = d.querySelector('#site-user-in').value; who = bn.dataset.who; draw(''); d.querySelector('#site-user-in').value = u0; }; });
         f.onsubmit = async function(e){
           e.preventDefault(); err.style.color = '#B23A2E'; err.textContent = ''; var btn = f.querySelector('button[type=submit]'), label = btn.textContent; btn.disabled = true; btn.textContent = 'Memeriksa…';
-          var body = {username: d.querySelector('#site-user-in').value, password: d.querySelector('#site-pw').value}; if(mode === 'req') body.name = d.querySelector('#site-name').value; else if(who === 'admin') body.as = 'admin';
+          var body = {username: d.querySelector('#site-user-in').value, password: d.querySelector('#site-pw').value}; if(mode === 'req'){ body.name = d.querySelector('#site-name').value; body.kind = kind; } else if(who === 'admin') body.as = 'admin';
           try{
             var r = await fetch('/api/' + (mode === 'req' ? 'request-access' : 'login'), {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body)});
             var j = await r.json();
@@ -749,6 +838,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       say('Memuat data Anda…');
       var rs = await api('scoped'); if(!rs.ok) throw new Error('Gagal memuat data Anda (HTTP ' + rs.status + ')');
       var SD = await rs.json();
+      window.__rank = function(a, b){ return api('rank?from=' + a + '&to=' + b).then(function(r){ return r.json(); }); };
       window.__salesApp(SD, function(){ setTok(''); try{ sessionStorage.removeItem('sx_state'); }catch(e){} location.reload(); });
       if(L) L.remove(); startSiteUi();
       return new Promise(function(){});
@@ -789,11 +879,13 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         + (msg ? '<div style="color:#B23A2E;font-size:13px;margin-bottom:8px;">' + esc(msg) + '</div>' : '');
       h += '<div style="font-weight:700;margin:10px 0 4px;">Permintaan akses (' + data.pending.length + ')</div>';
       if(!data.pending.length) h += '<div style="font-size:13px;color:#777;">Tidak ada permintaan.</div>';
-      data.pending.forEach(function(p){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;"><div><b>' + esc(p.name) + '</b> <span style="color:#777;">(' + esc(p.username) + ')</span><div style="font-size:11.5px;color:#888;">' + esc((p.requestedAt || '').slice(0,16).replace('T',' ')) + '</div></div><div><button data-a="approve" data-r="viewer" data-u="' + esc(p.username) + '" style="'+BT+'background:#D9720B;color:#241500;">Setujui Viewer</button><button data-a="approve" data-r="admin" data-u="' + esc(p.username) + '" style="'+BT+'background:#17262E;color:#fff;">Setujui Admin</button>' + (SMAP[p.username] ? '<button data-a="approve" data-r="sales" data-u="' + esc(p.username) + '" style="'+BT+'background:#1B7F4B;color:#fff;">Setujui Salesperson (' + esc(SMAP[p.username].mb) + ')</button>' : '') + '<button data-a="reject" data-u="' + esc(p.username) + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Tolak</button></div></div>'; });
+      data.pending.forEach(function(p){ var kd = p.kind || 'tl', kl = kd === 'manager' ? 'Manager' : kd === 'sales' ? 'Sales' : 'Team Leader', U = esc(p.username), B = function(r, t, bg, fg){ return '<button data-a="approve" data-r="' + r + '" data-u="' + U + '" style="'+BT+'background:' + bg + ';color:' + fg + ';">' + t + '</button>'; };
+        var btns = kd === 'sales' ? (SMAP[p.username] ? B('sales', 'Setujui Salesperson (' + esc(SMAP[p.username].mb) + ')', '#1B7F4B', '#fff') : '<span style="font-size:12px;color:#B23A2E;">ID tidak ada di database</span>') : kd === 'manager' ? B('admin', 'Setujui Manager (Admin)', '#17262E', '#fff') + B('viewer', 'Setujui sbg Team Leader', '#D9720B', '#241500') : B('viewer', 'Setujui Team Leader', '#D9720B', '#241500') + B('admin', 'Setujui sbg Admin', '#17262E', '#fff');
+        h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;"><div><b>' + esc(p.name) + '</b> <span style="color:#777;">(' + U + ')</span> · <span style="font-size:12px;font-weight:700;color:#D9720B;">Minta: ' + kl + '</span><div style="font-size:11.5px;color:#888;">' + esc((p.requestedAt || '').slice(0,16).replace('T',' ')) + '</div></div><div>' + btns + '<button data-a="reject" data-u="' + U + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Tolak</button></div></div>'; });
       h += '<div style="font-weight:700;margin:14px 0 4px;">Pengguna aktif (' + data.users.length + ')</div>';
       if(!data.users.length) h += '<div style="font-size:13px;color:#777;">Belum ada pengguna selain admin utama.</div>';
-      data.users.forEach(function(u){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div><b>' + esc(u.name) + '</b> <span style="color:#777;">(' + esc(u.username) + ')</span> · ' + (u.role === 'admin' ? 'Admin' : u.role === 'sales' ? 'Salesperson · ' + esc(u.mb || '') : 'Viewer') + (u.disabled ? ' · <span style="color:#B23A2E;">nonaktif</span>' : '') + '</div><div>'
-        + (u.role === 'sales' ? '' : '<button data-a="role" data-r="' + (u.role === 'admin' ? 'viewer' : 'admin') + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Jadikan ' + (u.role === 'admin' ? 'Viewer' : 'Admin') + '</button>')
+      data.users.forEach(function(u){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div><b>' + esc(u.name) + '</b> <span style="color:#777;">(' + esc(u.username) + ')</span> · ' + (u.role === 'admin' ? 'Manager / Admin' : u.role === 'sales' ? 'Sales · ' + esc(u.mb || '') : 'Team Leader (Viewer)') + (u.disabled ? ' · <span style="color:#B23A2E;">nonaktif</span>' : '') + '</div><div>'
+        + (u.role === 'sales' ? '' : '<button data-a="role" data-r="' + (u.role === 'admin' ? 'viewer' : 'admin') + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Jadikan ' + (u.role === 'admin' ? 'Team Leader (bukan admin)' : 'Admin') + '</button>')
         + '<button data-a="toggle" data-d="' + (u.disabled ? 0 : 1) + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">' + (u.disabled ? 'Aktifkan' : 'Nonaktifkan') + '</button>'
         + '<button data-a="pw" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Reset password</button>'
         + '<button data-a="del" data-u="' + esc(u.username) + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Hapus akses</button></div></div>'; });
@@ -801,7 +893,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         + '<input name="name" placeholder="Nama lengkap" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;">'
         + '<input name="username" placeholder="user (huruf kecil)" autocapitalize="none" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;">'
         + '<input name="password" placeholder="password (min. 8)" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;">'
-        + '<select name="role" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'
+        + '<select name="role" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><option value="viewer">Team Leader (Viewer)</option><option value="admin">Manager (Admin)</option></select>'
         + '<button type="submit" style="'+BT+'background:#D9720B;color:#241500;padding:10px;">Tambah</button></form>'
 ;
       h += '<div style="font-weight:700;margin:16px 0 4px;">Akun Salesperson <span style="font-weight:500;color:#777;font-size:12px;">(user = Salesperson ID; hanya melihat data sendiri &amp; master brand-nya)</span></div>';
@@ -813,7 +905,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       h += '<form id="sadd" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;"><input name="id" list="sx-ids" placeholder="Salesperson ID (mis. S80000-0000000401)" autocapitalize="characters" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><datalist id="sx-ids">' + SM.list.map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.name + ' — ' + x.mb) + '</option>'; }).join('') + '</datalist>'
         + '<input name="password" placeholder="password (kosong = acak)" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><button type="submit" style="'+BT+'background:#D9720B;color:#241500;padding:10px;">Buat Akun Salesperson</button></form>'
         + '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;">Buat banyak sekaligus</summary><textarea id="sbulk" rows="3" placeholder="Tempel beberapa Salesperson ID (pisahkan dengan spasi / koma / baris baru)" style="width:100%;margin-top:6px;padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;box-sizing:border-box;"></textarea><button data-a="bulk" style="'+BT+'background:#17262E;color:#fff;padding:9px 12px;">Buat dari daftar</button><button data-a="all" style="'+BT+'background:#eee;padding:9px 12px;">Buat untuk SEMUA yang belum punya akun (' + freeN + ')</button></details>';
-      h += '<div style="font-size:11.5px;color:#888;margin-top:10px;">Viewer: melihat semua menu kecuali Data Customer &amp; Upload Data. Admin: semua menu + Upload Data + Data Customer (kelola pengguna hanya untuk admin utama). Salesperson: hanya halaman "Performa Saya" (data sendiri + master brand-nya).</div></div>';
+      h += '<div style="font-size:11.5px;color:#888;margin-top:10px;">Team Leader (Viewer): semua menu kecuali Data Customer &amp; Upload Data. Manager (Admin): semua menu + Upload Data + Data Customer (Kelola Pengguna hanya untuk admin utama). Sales: hanya halaman "Performa Saya" (data sendiri + master brand-nya).</div></div>';
 
       d.innerHTML = h;
       d.querySelector('#uc').onclick = function(){ d.remove(); };
@@ -1657,6 +1749,8 @@ function computeFactsFromRows(rows){
   const memberTx = [];
   const itemMeta = {};
   const touchedYM = new Set();
+  const _smap = salperMap(), _utok = new Map(), _noBrand = new Set(['private brand','kasir','team leader','project','sm / dsm']);
+  const _tokMB = s => { s = String(s||'').trim().toLowerCase(); return new Set([s].concat(s.split(/[&\/,]/).map(x=>x.trim()).filter(Boolean))); };
 
   function key(...parts){ return parts.join('|'); }
 
@@ -1687,13 +1781,15 @@ function computeFactsFromRows(rows){
     // keeps ONE fixed zona regardless of which product category they sold, unlike the old category-derived split)
     // Kept at daily granularity (d) so the Sales Person page can filter to specific dates within a month.
     const k4 = key(r.y,r.m,r.d,r.spId);
-    if(!spFact.has(k4)) spFact.set(k4, {y:r.y,m:r.m,d:r.d,spId:r.spId,spName:r.spName,amt:0,pbAmt:0,protectionQty:0,protectionAmt:0,projectAmt:0,whatsappAmt:0,qty:0,notas:new Map()});
+    if(!spFact.has(k4)) spFact.set(k4, {y:r.y,m:r.m,d:r.d,spId:r.spId,spName:r.spName,amt:0,pbAmt:0,protectionQty:0,protectionAmt:0,projectAmt:0,whatsappAmt:0,qty:0,brandAmt:0,notas:new Map(),projNotas:new Set(),waNotas:new Set()});
     const s4 = spFact.get(k4);
     s4.qty += r.qty; if(!s4.notas.has(r.nota)) s4.notas.set(r.nota, new Set()); s4.notas.get(r.nota).add(r.item); // dasar IPD/IPI per salesperson
     s4.amt += r.amt; if(r.isPB) s4.pbAmt += r.amt;
     if(String(r.subcat||'').trim().toUpperCase()==='PROTECTION'){ s4.protectionQty += r.qty; s4.protectionAmt += r.amt; }
-    if(r.source==='Sales Project') s4.projectAmt += r.amt;
-    if(r.source==='WhatsApp') s4.whatsappAmt += r.amt;
+    if(r.source==='Sales Project'){ s4.projectAmt += r.amt; s4.projNotas.add(r.nota); }
+    if(r.source==='WhatsApp'){ s4.whatsappAmt += r.amt; s4.waNotas.add(r.nota); }
+    { let ut = _utok.get(r.spId); if(ut===undefined){ const sr = _smap.get(r.spId), mb = sr ? String(sr.masterBrand||'').trim().toLowerCase() : ''; ut = (!mb || _noBrand.has(mb)) ? null : _tokMB(mb); _utok.set(r.spId, ut); }
+      if(ut){ for(const t of _tokMB(r.masterBrand)){ if(ut.has(t)){ s4.brandAmt += r.amt; break; } } } } // brandAmt: penjualan salesperson atas master brand miliknya (dasar kartu "Sales by Brand")
 
     // sourceFact: y,m,source
     const k5 = key(r.y,r.m,r.source);
@@ -1735,7 +1831,7 @@ function computeFactsFromRows(rows){
     brandFact: [...brandFact.values()],
     itemFact: [...itemFact.values()],
     itemDayFact: [...itemDayFact.values()],
-    spFact: [...spFact.values()].map(({notas,...f})=>({...f, inv:notas.size, items:[...notas.values()].reduce((a,x)=>a+x.size,0)})),
+    spFact: [...spFact.values()].map(({notas,projNotas,waNotas,...f})=>({...f, inv:notas.size, items:[...notas.values()].reduce((a,x)=>a+x.size,0), projInv:projNotas.size, waInv:waNotas.size})),
     sourceFact: sourceFactArr,
     sourceDailyFact: sourceDailyFactArr,
     hourFact: [...hourFact.values()], brandDayFact: [...brandDayFact.values()], sourceZonaFact: [...sourceZonaFact.values()],

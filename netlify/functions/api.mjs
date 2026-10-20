@@ -98,6 +98,7 @@ async function loadPayload() {
   return JSON.parse(s);
 }
 let _eff = null, _effRev = null; const _scoped = new Map();
+const ymdOf = (r) => r.y + '-' + String(r.m).padStart(2, '0') + '-' + String(r.d).padStart(2, '0');
 async function effective() {
   const rev = (await store().get('rev')) || '0';
   if (_eff && _effRev === rev) return _eff;
@@ -105,47 +106,75 @@ async function effective() {
   let pl = null; try { pl = await loadPayload(); } catch { pl = null; }
   if (pl && (pl.__ver || 0) < seedVer) pl = null; // data bawaan lebih baru
   const pick = (k) => (pl && pl[k] !== undefined ? (Array.isArray(pl[k]) ? pl[k] : dec(pl[k])) : dec(seed[k]));
-  let salperFact = pick('salperFact');
-  const sd = seed.dataMeta && seed.dataMeta.salper && seed.dataMeta.salper.uploadedAt, pd = pl && pl.dataMeta && pl.dataMeta.salper && pl.dataMeta.salper.uploadedAt;
-  if (sd && (!pd || sd > pd)) salperFact = dec(seed.salperFact); // aturan kunci tanggal sama seperti di dashboard
-  const dm = (pl && pl.dataMeta) || seed.dataMeta || {};
-  _eff = { spFact: pick('spFact'), salperFact, brandFact: pick('brandFact'), brandDayFact: pick('brandDayFact'), salesFact: pick('salesFact'), itemFact: pick('itemFact'), itemDayFact: pick('itemDayFact'), itemMeta: mergePb((pl && pl.itemMeta) || seed.itemMeta || {}, seed.itemMeta || {}), tlMentor: pick('tlMentor'), meta: seed.meta || {}, dataMeta: dm };
+  // grup data hasil upload terpisah (salper / stok): bila file bawaan lebih baru dari hasil upload di server, pakai bawaan (aturan tanggal sama seperti di dashboard)
+  const sdm = seed.dataMeta || {}, pdm = (pl && pl.dataMeta) || {};
+  const grp = (mk, dk, keys) => { const s = sdm[mk] && sdm[mk][dk], p = pdm[mk] && pdm[mk][dk]; const useSeed = s && (!p || s > p); const o = {}; keys.forEach((k) => { o[k] = useSeed ? dec(seed[k]) : pick(k); }); return o; };
+  const sp = grp('salper', 'uploadedAt', ['salperFact', 'budgetSalperFact', 'tlMentor']);
+  const sqv = grp('sqv', 'stockDate', ['sqvItems']);
+  const dcg = (() => { const s = sdm.dc && sdm.dc.reportDate, p = pdm.dc && pdm.dc.reportDate; const useSeed = s && (!p || s > p); const v = useSeed ? seed.dcByItem : ((pl && pl.dcByItem) || seed.dcByItem); return v || {}; })();
+  const dm = Object.assign({}, sdm, pdm);
+  // lengkapi baris spFact hasil upload lama dengan kolom baru (invoice Project/WhatsApp, sales by brand) dari data bawaan
+  let spFact = pick('spFact');
+  if (pl && spFact.length && spFact[0].projInv === undefined) {
+    const add = new Map(); dec(seed.spFact).forEach((r) => { if (r.projInv !== undefined) add.set(r.y + '|' + r.m + '|' + (r.d || 0) + '|' + normId(r.spId), r); });
+    spFact = spFact.map((r) => { if (r.projInv !== undefined) return r; const x = add.get(r.y + '|' + r.m + '|' + (r.d || 0) + '|' + normId(r.spId)); return x ? { ...r, projInv: x.projInv, waInv: x.waInv, brandAmt: x.brandAmt } : r; });
+  }
+  const itemDayFact = pick('itemDayFact');
+  // tanggal data terakhir = dari data yang benar-benar ada (termasuk hasil upload admin), bukan dari data bawaan saja
+  let maxD = ''; for (const r of spFact) if (r.d && r.y === 2026) { const s = ymdOf(r); if (s > maxD) maxD = s; }
+  for (const r of itemDayFact) if (r.y === 2026) { const s = ymdOf(r); if (s > maxD) maxD = s; }
+  const smTo = dm.sales && dm.sales.to ? String(dm.sales.to).slice(0, 10) : ''; if (smTo > maxD) maxD = smTo;
+  const meta = { ...(seed.meta || {}), years: (seed.meta && seed.meta.years) || [2025, 2026] };
+  if (maxD) { meta.latestDate2026 = maxD; meta.latestMonth2026 = +maxD.slice(5, 7); }
+  _eff = { spFact, salperFact: sp.salperFact, budgetSalperFact: sp.budgetSalperFact, tlMentor: sp.tlMentor, itemFact: pick('itemFact'), itemDayFact, budgetDailyFact: pick('budgetDailyFact'), budgetPBFact: pick('budgetPBFact'), sqvItems: sqv.sqvItems, dcByItem: dcg, itemMeta: mergePb((pl && pl.itemMeta) || seed.itemMeta || {}, seed.itemMeta || {}), meta, dataMeta: dm };
   _effRev = rev; _scoped.clear(); return _eff;
 }
 const ZONA_MAP = { 'FLOORING AND WALL': 'Zona 1', 'BATHROOM': 'Zona 2', 'PLUMBING': 'Zona 2', 'APPLIANCES': 'Zona 3', 'DOORS AND WINDOWS': 'Zona 3', 'ELECTRICAL AND LIGHTING': 'Zona 3', 'HARDWARE': 'Zona 3', 'HOUSEWARE & HOBBIES': 'Zona 3', 'HOBBIES': 'Zona 3', 'KITCHEN': 'Zona 3', 'TOOLS': 'Zona 3', 'MISCELLANEOUS': 'Zona 3', 'BUILDING MATERIAL': 'Zona 4', 'PAINT AND SUNDRIES': 'Zona 4' };
 const ZONA_CHANGES = [{ fromMonth: 10, cat: 'BUILDING MATERIAL', zona: 'Zona 1' }]; // sama seperti di dashboard
 function zonaOf(cat, m) { const c = String(cat || '').trim().toUpperCase(); let z = ZONA_MAP[c]; for (const ch of ZONA_CHANGES) if (ch.cat === c && m >= ch.fromMonth) z = ch.zona; return z || 'Zona Lainnya'; }
 function mergePb(meta, seedMeta) { if (meta === seedMeta) return meta; let any = false; for (const k in meta) { if (meta[k] && meta[k].pb) { any = true; break; } } if (any) return meta; for (const k in seedMeta) if (seedMeta[k] && seedMeta[k].pb && meta[k]) meta[k] = { ...meta[k], pb: 1 }; return meta; }
-function brandKeys(mb, names) {
-  const set = new Set(), all = new Map(names.map((n) => [String(n).toLowerCase(), n]));
-  const toks = [String(mb || '')].concat(String(mb || '').split(/\s*[&\/,]\s*/));
-  for (const t0 of toks) { const t = t0.trim().toLowerCase(); if (!t) continue; if (all.has(t)) set.add(all.get(t)); for (const [k, n] of all) if (k.startsWith(t + ' ')) set.add(n); }
-  return set;
-}
+// Master brand dicocokkan lewat master brand tiap item (bukan lewat nama brand): nama persis, atau salah satu bagian "A & B", "A, B", "A / B".
+const NO_BRAND = new Set(['', 'private brand', 'kasir', 'team leader', 'project', 'sm / dsm']);
+const mbTok = (s) => { const t = String(s || '').trim().toLowerCase(); return new Set([t].concat(t.split(/\s*[&\/,]\s*/).map((x) => x.trim()).filter(Boolean))); };
+function mbMatcher(mb) { const ut = mbTok(mb); return (rowMb) => { for (const t of mbTok(rowMb)) if (t && ut.has(t)) return true; return false; }; }
 function scopedFor(eff, spId) {
   const id = normId(spId);
   const row = eff.salperFact.find((r) => normId(r.spId) === id);
   const sp = eff.spFact.filter((r) => normId(r.spId) === id);
   const tl = (eff.tlMentor.find((r) => normId(r.spId) === id) || {}).tl || '';
-  const mb = row ? row.masterBrand : '';
-  const names = [...new Set(eff.brandFact.map((r) => r.brand))];
-  const keys = mb === 'Private Brand' ? new Set() : brandKeys(mb, names);
-  const brandFact = eff.brandFact.filter((r) => keys.has(r.brand));
-  const brandDayFact = eff.brandDayFact.filter((r) => keys.has(r.brand));
-  const lk = new Set([...keys].map((k) => String(k).toLowerCase())), itemMeta = {}, isPB = mb === 'Private Brand', zona = row ? row.zona : '';
-  let itemFact = [], itemDayFact = [];
-  if (isPB) { // Master Type Brand = Private Brand + Exclusive Brand, pada zona milik Salesperson ini (zona dihitung per bulan seperti di dashboard)
-    const ok = (id, m) => { const v = eff.itemMeta[id]; return v && v.pb && zonaOf(v.cat, m) === zona; };
-    itemFact = eff.itemFact.filter((r) => ok(r.item, r.m)); itemDayFact = eff.itemDayFact.filter((r) => ok(r.item, r.m));
-    for (const r of itemFact.concat(itemDayFact)) if (!itemMeta[r.item]) { const v = eff.itemMeta[r.item]; itemMeta[r.item] = { name: v.name, cat: v.cat, subcat: v.subcat, brand: v.brand, mb: v.masterBrand }; }
-  } else if (lk.size) {
-    for (const [id, v] of Object.entries(eff.itemMeta)) if (v && lk.has(String(v.masterBrand || '').toLowerCase())) itemMeta[id] = { name: v.name, cat: v.cat, subcat: v.subcat, brand: v.brand, mb: v.masterBrand };
-    itemFact = eff.itemFact.filter((r) => itemMeta[r.item]); itemDayFact = eff.itemDayFact.filter((r) => itemMeta[r.item]);
+  const mb = row ? String(row.masterBrand || '').trim() : '', zona = row ? row.zona : '';
+  const isPB = mb.toLowerCase() === 'private brand', noBrand = NO_BRAND.has(mb.toLowerCase()) && !isPB;
+  const latestM = eff.meta.latestMonth2026 || 12;
+  const itemMeta = {}; let brandMode = 'none';
+  const put = (id2, v) => { if (!itemMeta[id2]) itemMeta[id2] = { name: v.name || v.itemName || id2, cat: v.cat || '', subcat: v.subcat || '', func: v.func || '', brand: v.brand || '', mb: v.masterBrand || '' }; };
+  if (isPB) {
+    if (zona) { brandMode = 'pb'; for (const [k, v] of Object.entries(eff.itemMeta)) if (v && v.pb && zonaOf(v.cat, latestM) === zona) put(k, v); }
+  } else if (!noBrand && mb) {
+    const match = mbMatcher(mb);
+    for (const [k, v] of Object.entries(eff.itemMeta)) if (v && match(v.masterBrand)) put(k, v);
+    for (const v of eff.sqvItems) if (match(v.masterBrand)) put(v.item, v);
+    if (Object.keys(itemMeta).length) brandMode = 'brand';
   }
-  const pb = [];
-  const brandMode = isPB ? (zona ? 'pb' : 'none') : keys.size ? 'brand' : 'none';
-  const sm = (eff.dataMeta && eff.dataMeta.sales) || {};
-  return { user: { spId: (row && row.spId) || spId, name: (row && row.spName) || (sp[0] && sp[0].spName) || spId, zona: row ? row.zona : '', kriteria: row ? row.kriteria : '', mb, tl }, brandMode, brandNames: [...keys], spFact: sp, brandFact, brandDayFact, itemFact, itemDayFact, itemMeta, pbFact: pb, meta: { latestMonth2026: eff.meta.latestMonth2026, latestDate2026: eff.meta.latestDate2026, years: eff.meta.years }, sales: { from: sm.from, to: sm.to } };
+  // stok toko (Stock Qty & Value) + stok DC + class item
+  const stockOf = {}; for (const v of eff.sqvItems) if (itemMeta[v.item] || (isPB && eff.itemMeta[v.item] && eff.itemMeta[v.item].pb && zonaOf(eff.itemMeta[v.item].cat, latestM) === zona)) stockOf[v.item] = v;
+  for (const [k, v] of Object.entries(stockOf)) { if (!itemMeta[k]) put(k, eff.itemMeta[k] || v); const m = itemMeta[k]; m.sq = v.qty || 0; m.sv = v.value || 0; if (v.cls) m.cls = v.cls; }
+  for (const k of Object.keys(itemMeta)) { const dc = eff.dcByItem[k]; if (dc) { let t = 0; for (const s in dc) t += dc[s] || 0; itemMeta[k].dc = t; } }
+  const itemFact = eff.itemFact.filter((r) => itemMeta[r.item]), itemDayFact = eff.itemDayFact.filter((r) => itemMeta[r.item]);
+  const budget = (eff.budgetSalperFact || []).filter((r) => r.zona === zona).map((r) => ({ m: r.m, value: r.value }));
+  let brandBudget = null; if (isPB && zona) { const bm = {}; for (const r of eff.budgetPBFact || []) if (zonaOf(r.cat, r.m) === zona) bm[r.m] = (bm[r.m] || 0) + (r.value || 0); brandBudget = Object.entries(bm).map(([m, value]) => ({ m: +m, value })); }
+  const bd = {}; for (const r of eff.budgetDailyFact || []) { const a = bd[r.m] || (bd[r.m] = []); a[r.d - 1] = (a[r.d - 1] || 0) + (r.value || 0); }
+  const dm = eff.dataMeta || {}, sm = dm.sales || {};
+  return { user: { spId: (row && row.spId) || spId, name: (row && row.spName) || (sp[0] && sp[0].spName) || spId, zona, kriteria: row ? row.kriteria : '', mb, tl }, brandMode, spFact: sp, itemFact, itemDayFact, itemMeta, budget, brandBudget, budgetDay: bd,
+    meta: { latestMonth2026: eff.meta.latestMonth2026, latestDate2026: eff.meta.latestDate2026, years: eff.meta.years }, sales: { from: sm.from, to: eff.meta.latestDate2026 || sm.to }, stock: { date: dm.sqv && dm.sqv.stockDate, dc: dm.dc && dm.dc.reportDate } };
+}
+// ranking: hanya nomor urut di antara Salesperson sekelompok (Kriteria + Zona yang sama); angka milik orang lain tidak dikirim
+function rankFor(eff, spId, from, to) {
+  const id = normId(spId), row = eff.salperFact.find((r) => normId(r.spId) === id); if (!row) return { rank: null, of: 0 };
+  const peers = new Set(eff.salperFact.filter((r) => r.kriteria === row.kriteria && r.zona === row.zona).map((r) => normId(r.spId)));
+  const tot = new Map(); for (const r of eff.spFact) { if (!r.d || r.y !== 2026) continue; const k = normId(r.spId); if (!peers.has(k)) continue; const s = ymdOf(r); if (s < from || s > to) continue; tot.set(k, (tot.get(k) || 0) + (r.amt || 0)); }
+  const mine = tot.get(id) || 0; if (mine <= 0) return { rank: null, of: [...tot.values()].filter((v) => v > 0).length, group: row.kriteria + ' ' + row.zona };
+  let better = 0, n = 0; for (const v of tot.values()) { if (v > 0) n++; if (v > mine) better++; }
+  return { rank: better + 1, of: n, group: row.kriteria + ' ' + row.zona };
 }
 async function salesMap() { const eff = await effective(); const m = new Map(); eff.salperFact.forEach((r) => { if (r.spId) m.set(normId(r.spId), { id: r.spId, name: r.spName, zona: r.zona, mb: r.masterBrand }); }); return m; }
 const rndPw = () => { const al = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const b = randomBytes(10); let s = ''; for (let i = 0; i < 10; i++) s += al[b[i] % al.length]; return s; };
@@ -180,15 +209,21 @@ export default async (req) => {
       await sleep(600);
       if (!name) return json({ ok: false, error: 'Nama lengkap wajib diisi.' }, 400);
       if (pw.length < 8) return json({ ok: false, error: 'Password minimal 8 karakter.' }, 400);
-      const info = (await salesMap()).get(u);
-      if (!info) return json({ ok: false, error: 'User harus berupa Salesperson ID yang terdaftar, contoh: S80000-0000000449.' }, 400);
-      const words = (s) => String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 2);
-      const dbw = new Set(words(info.name));
-      if (!words(name).some((w) => dbw.has(w))) return json({ ok: false, error: 'Nama harus mengandung salah satu kata dari nama Anda di database Salesperson (cukup satu kata, mis. nama depan atau belakang).' }, 400);
+      const kind = ['manager', 'tl', 'sales'].includes(b.kind) ? b.kind : 'sales';
+      if (kind === 'sales') {
+        const info = (await salesMap()).get(u);
+        if (!info) return json({ ok: false, error: 'User harus berupa Salesperson ID yang terdaftar, contoh: S80000-0000000449.' }, 400);
+        const words = (s) => String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 2);
+        const dbw = new Set(words(info.name));
+        if (!words(name).some((w) => dbw.has(w))) return json({ ok: false, error: 'Nama harus mengandung salah satu kata dari nama Anda di database Salesperson (cukup satu kata, mis. nama depan atau belakang).' }, 400);
+      } else {
+        if (!USERNAME_RE.test(u)) return json({ ok: false, error: 'User 3–60 karakter: huruf kecil, angka, titik, strip, garis bawah, atau alamat email.' }, 400);
+        if (ID_RE.test(u)) return json({ ok: false, error: 'Format Salesperson ID hanya untuk kriteria Sales. Pilih kriteria "Sales" atau pakai user lain.' }, 400);
+      }
       const db = await loadUsers();
-      if (isOwner(u) || db.users[u] || db.pending[u]) return json({ ok: false, error: 'Salesperson ID ini sudah punya akun / sudah mengajukan akses.' }, 409);
+      if (isOwner(u) || db.users[u] || db.pending[u]) return json({ ok: false, error: kind === 'sales' ? 'Salesperson ID ini sudah punya akun / sudah mengajukan akses.' : 'User ini sudah punya akun / sudah mengajukan akses.' }, 409);
       if (Object.keys(db.pending).length >= 100) return json({ ok: false, error: 'Antrian permintaan penuh. Hubungi admin.' }, 429);
-      db.pending[u] = { name, ...newCred(pw), requestedAt: new Date().toISOString() };
+      db.pending[u] = { name, kind, ...newCred(pw), requestedAt: new Date().toISOString() };
       await saveUsers(db);
       return json({ ok: true, message: 'Permintaan terkirim. Tunggu persetujuan admin, lalu login.' });
     }
@@ -211,6 +246,10 @@ export default async (req) => {
         if (!_scoped.has(k)) { if (_scoped.size > 60) _scoped.clear(); _scoped.set(k, JSON.stringify(scopedFor(eff, me.spId))); }
         return new Response(_scoped.get(k), { headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
       }
+      if (path === 'rank' && method === 'GET') {
+        const f = url.searchParams.get('from') || '', t = url.searchParams.get('to') || ''; if (!/^\d{4}-\d{2}-\d{2}$/.test(f) || !/^\d{4}-\d{2}-\d{2}$/.test(t)) return json({ error: 'Tanggal tidak valid.' }, 400);
+        return json(rankFor(await effective(), me.spId, f, t));
+      }
       return json({ error: 'Akun Salesperson hanya dapat melihat data miliknya.' }, 403);
     }
 
@@ -218,7 +257,7 @@ export default async (req) => {
     if (parts[0] === 'admin' && parts[1] === 'users') {
       if (me.user !== OWNER_USER) return json({ error: 'Kelola pengguna hanya untuk admin utama (' + OWNER_USER + ').' }, 403);
       const db = await loadUsers(); let target = ''; try { target = decodeURIComponent(parts[2] || '').toLowerCase(); } catch {}
-      const pub = () => ({ owner: OWNER_USER, users: Object.entries(db.users).map(([u, r]) => ({ username: u, name: r.name, role: roleName(r.role, u), spId: r.spId || (ID_RE.test(u) ? u : null), mb: r.mb || null, disabled: !!r.disabled, created: r.created })), pending: Object.entries(db.pending).map(([u, r]) => ({ username: u, name: r.name, requestedAt: r.requestedAt })) });
+      const pub = () => ({ owner: OWNER_USER, users: Object.entries(db.users).map(([u, r]) => ({ username: u, name: r.name, role: roleName(r.role, u), spId: r.spId || (ID_RE.test(u) ? u : null), mb: r.mb || null, disabled: !!r.disabled, created: r.created })), pending: Object.entries(db.pending).map(([u, r]) => ({ username: u, name: r.name, kind: r.kind || (ID_RE.test(u) ? 'sales' : 'tl'), requestedAt: r.requestedAt })) });
       if (method === 'GET' && !target) return json(pub());
       let b = {}; if (method !== 'GET' && method !== 'DELETE') { try { b = await req.json(); } catch {} }
       const roleOk = (r) => (r === 'admin' ? 'admin' : 'viewer');
@@ -255,7 +294,7 @@ export default async (req) => {
       if (method === 'POST' && parts[3] === 'approve') {
         const p = db.pending[target]; if (!p) return json({ error: 'Permintaan tidak ditemukan.' }, 404);
         if (b.role === 'sales' || (ID_RE.test(target) && b.role !== 'admin')) { const info = (await salesMap()).get(target); if (!info) return json({ error: 'User ini bukan Salesperson ID yang terdaftar.' }, 400); db.users[target] = { name: cleanName(info.name) || p.name, role: 'sales', spId: info.id, mb: info.mb, salt: p.salt, hash: p.hash, pv: 1, created: new Date().toISOString() }; delete db.pending[target]; await saveUsers(db); return json(pub()); }
-        db.users[target] = { name: p.name, role: roleOk(b.role), salt: p.salt, hash: p.hash, pv: 1, created: new Date().toISOString() }; delete db.pending[target];
+        db.users[target] = { name: p.name, role: roleOk(b.role || (p.kind === 'manager' ? 'admin' : 'viewer')), kind: p.kind === 'manager' ? 'manager' : 'tl', salt: p.salt, hash: p.hash, pv: 1, created: new Date().toISOString() }; delete db.pending[target];
         await saveUsers(db); return json(pub());
       }
       if (method === 'POST' && parts[3] === 'reject') { delete db.pending[target]; await saveUsers(db); return json(pub()); }
