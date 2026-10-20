@@ -25,6 +25,8 @@ Opsional di Netlify → Environment variables: `ADMIN_USER` + `ADMIN_PASSWORD` (
 - **Hanya admin utama (`miranto.101993@gmail.com`)** yang punya menu **Kelola Pengguna**. Admin lain tetap bisa Upload Data & Data Customer, tapi tidak bisa mengelola pengguna.
 - Admin utama: login → menu kiri bawah **Kelola Pengguna** → **Setujui Viewer / Setujui Admin / Tolak**; juga bisa **Tambah user langsung**, **Jadikan Admin/Viewer**, **Nonaktifkan**, **Reset password**, **Hapus akses**. Hapus/nonaktifkan memutus akses saat itu juga.
 - **Viewer**: semua menu KECUALI **Data Customer** dan **Upload Data**. **Admin**: semua + Upload Data + Data Customer (tanpa Kelola Pengguna). Data Customer hanya dikirim server ke Admin.
+- **Salesperson** (user = Salesperson ID, mis. `S80000-0000000401`): hanya melihat halaman **Performa Saya** — Sales miliknya + master brand-nya + detail penjualan item master brand-nya (otomatis dari database Salesperson), dengan filter YTD / Semester / Kuartal / Bulan / Tanggal. Data orang lain & menu lain TIDAK dikirim server ke akunnya. Dibuat oleh admin utama lewat Kelola Pengguna → *Akun Salesperson* (satu per satu, banyak sekaligus, atau semua yang belum punya akun; password acak ditampilkan sekali + unduh CSV untuk dibagikan). Orang juga bisa Minta Akses memakai ID-nya, lalu admin pilih *Setujui Salesperson*.
+- Master brand tanpa data brand (Kasir, Team Leader, Project, SM / DSM, Penyu) hanya menampilkan Sales pribadi; master brand *Private Brand* memakai data penjualan Private Brand.
 - Admin utama (dari Netlify) tidak bisa dihapus. Lupa password admin utama → ganti `ADMIN_PASSWORD` di Netlify & deploy ulang.
 - Password disimpan sebagai hash (scrypt), bukan teks asli. Ubah peran / reset password otomatis mengeluarkan sesi lama user itu.
 - Catatan: jika dua admin menyimpan perubahan pengguna pada detik yang sama, salah satu bisa tertimpa — ulangi bila perlu.
@@ -37,3 +39,12 @@ Admin: Upload Data → upload file → tunggu "Tersimpan". Viewer otomatis memua
 2. Pastikan di bawah menu kiri tertulis "Masuk sebagai Admin".
 3. Di perangkat lain buka Console (F12) → `__siteCheck()` → bandingkan `tersimpanDiServer`.
 4. SQV/Stock DC/Salper bertanggal lebih lama dari data bawaan tidak menimpa data bawaan.
+
+## Permintaan akses (aturan)
+- User **wajib** Salesperson ID yang terdaftar (contoh `S80000-0000000449`), password minimal 8 karakter.
+- Nama harus mengandung **salah satu kata** dari nama di database Salesperson (contoh nama `Satriyo Adi Nugroho` → boleh `satriyo`, `adi`, atau `nugroho`).
+- Admin utama menyetujui lewat Kelola Pengguna → *Setujui Salesperson*.
+
+## Data Salesperson
+- Master brand biasa: sales brand + detail item brand, filter YTD/Semester/Kuartal/Bulan/Tanggal (item per tanggal tersedia untuk tahun berjalan).
+- Master brand **Private Brand**: penjualan *Private Brand + Exclusive Brand* (Master Type Brand) pada **zona masing-masing**, per brand, per kategori, dan per item.

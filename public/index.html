@@ -377,10 +377,272 @@ th[data-sort]{ cursor:pointer; user-select:none; } th[data-sort]:hover{ backgrou
 <style>/* Mode website: pengguna Viewer tidak melihat menu Upload */
 body.role-viewer #nav-upload{ display:none !important; }
 body.role-viewer #nav-customer{ display:none !important; }
+body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{ display:none !important; }
 </style>
 <link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 </head>
-<body><script>/* ===== Mode website: login, data dari server, penyimpanan bersama ===== */
+<body><script>/* ===== Halaman khusus akun Salesperson: "Performa Saya" =====
+   Hanya memakai data yang dikirim server (/api/scoped): data salesperson itu sendiri + data master brand-nya. */
+(function(){
+  var MN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  var MS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  var C_CUR = '#D9720B', C_LY = '#9AA7A0', INK = '#1F2A2E', SOFT = '#6b6f6a', LINE = '#e3dfd2', GOOD = '#1B7F4B', BAD = '#B23A2E';
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function num(n){ return Number(n) || 0; }
+  function fN(n){ return Math.round(num(n)).toLocaleString('id-ID'); }
+  function fRp(n){ n = num(n); var a = Math.abs(n), s = n < 0 ? '-' : '';
+    if(a >= 1e9) return s + 'Rp ' + (a/1e9).toLocaleString('id-ID', {maximumFractionDigits:2}) + ' M';
+    if(a >= 1e6) return s + 'Rp ' + (a/1e6).toLocaleString('id-ID', {maximumFractionDigits:1}) + ' Jt';
+    return s + 'Rp ' + Math.round(a).toLocaleString('id-ID'); }
+  function fShort(n){ n = num(n); var a = Math.abs(n); if(a >= 1e9) return (n/1e9).toFixed(1).replace('.',',') + ' M'; if(a >= 1e6) return (n/1e6).toFixed(a >= 1e8 ? 0 : 1).replace('.',',') + ' Jt'; if(a >= 1e3) return Math.round(n/1e3) + ' rb'; return String(Math.round(n)); }
+  function fDate(s){ if(!s) return '-'; var d = String(s).slice(0,10).split('-'); return d.length === 3 ? (+d[2]) + ' ' + MS[+d[1]-1] + ' ' + d[0] : s; }
+  function growth(cur, ly){ if(!ly) return null; return (cur - ly) / ly * 100; }
+  function gHtml(g){ if(g == null) return '<span style="color:'+SOFT+'">–</span>'; return '<span style="color:' + (g >= 0 ? GOOD : BAD) + ';font-weight:700;">' + (g >= 0 ? '▲ ' : '▼ ') + Math.abs(g).toLocaleString('id-ID', {maximumFractionDigits:1}) + '%</span>'; }
+
+  var CSS = '\
+  body.role-sales{ background:#F4F1EA; }\
+  #sx{ font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:'+INK+'; min-height:100vh; padding-bottom:40px; }\
+  #sx *{ box-sizing:border-box; }\
+  .sx-top{ background:#17262E; color:#fff; padding:14px 16px calc(12px); }\
+  .sx-top-in, .sx-wrap{ max-width:980px; margin:0 auto; }\
+  .sx-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }\
+  .sx-name{ font-weight:800; font-size:18px; line-height:1.2; }\
+  .sx-id{ font-size:12px; color:#9db0a6; margin-top:2px; }\
+  .sx-out{ border:1px solid #3a4d56; background:none; color:#F2B35E; border-radius:8px; padding:6px 10px; font-weight:700; font-size:12.5px; cursor:pointer; white-space:nowrap; }\
+  .sx-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }\
+  .sx-chip{ background:#233743; border-radius:999px; padding:4px 10px; font-size:12px; color:#dfe8e3; }\
+  .sx-chip b{ color:#fff; }\
+  .sx-bar{ position:sticky; top:0; z-index:20; background:#F4F1EA; border-bottom:1px solid '+LINE+'; padding:10px 16px 8px; }\
+  .sx-seg{ display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px; }\
+  .sx-seg button{ flex:0 0 auto; border:1px solid #cfcabb; background:#fff; color:#444; border-radius:999px; padding:8px 14px; font-weight:700; font-size:13.5px; cursor:pointer; }\
+  .sx-seg button.on{ background:#17262E; border-color:#17262E; color:#fff; }\
+  .sx-sub{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; font-size:13px; }\
+  .sx-sub select, .sx-sub input{ font-size:16px; padding:8px 10px; border:1px solid #cfcabb; border-radius:9px; background:#fff; color:'+INK+'; }\
+  .sx-tabs{ display:flex; gap:0; margin:14px 0 12px; border-bottom:2px solid '+LINE+'; }\
+  .sx-tabs button{ flex:1; border:0; background:none; padding:11px 8px; font-weight:800; font-size:14px; color:'+SOFT+'; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; }\
+  .sx-tabs button.on{ color:#17262E; border-bottom-color:'+C_CUR+'; }\
+  .sx-wrap{ padding:0 16px; }\
+  .sx-cards{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }\
+  @media(min-width:720px){ .sx-cards{ grid-template-columns:repeat(4,1fr); } }\
+  .sx-card{ background:#fff; border:1px solid '+LINE+'; border-radius:12px; padding:12px; min-width:0; }\
+  .sx-card .l{ font-size:11.5px; color:'+SOFT+'; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }\
+  .sx-card .v{ font-size:19px; font-weight:800; margin-top:4px; white-space:nowrap; }\
+  .sx-card .s{ font-size:12px; color:'+SOFT+'; margin-top:3px; }\
+  .sx-panel{ background:#fff; border:1px solid '+LINE+'; border-radius:12px; padding:14px; margin-top:12px; }\
+  .sx-ph{ font-weight:800; font-size:14.5px; margin-bottom:8px; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; align-items:baseline; }\
+  .sx-ph small{ font-weight:600; color:'+SOFT+'; font-size:12px; }\
+  .sx-leg{ display:flex; gap:12px; font-size:12px; color:'+SOFT+'; margin-bottom:4px; }\
+  .sx-leg i{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }\
+  .sx-tw{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -14px; padding:0 14px; }\
+  .sx-t{ width:100%; border-collapse:collapse; font-size:13px; }\
+  .sx-t th{ text-align:right; font-size:11.5px; color:'+SOFT+'; font-weight:700; padding:7px 8px; border-bottom:1px solid '+LINE+'; white-space:nowrap; }\
+  .sx-t td{ text-align:right; padding:8px; border-bottom:1px solid #f0ece0; white-space:nowrap; }\
+  .sx-t th:first-child, .sx-t td:first-child{ text-align:left; white-space:normal; }\
+  .sx-t tr.tot td{ font-weight:800; background:#faf7ef; }\
+  .sx-find{ width:100%; font-size:16px; padding:10px 12px; border:1px solid #cfcabb; border-radius:9px; background:#fff; margin-bottom:10px; }\
+  .sx-srt{ cursor:pointer; user-select:none; }\
+  .sx-more{ display:block; width:100%; margin-top:10px; padding:10px; border:1px solid #cfcabb; background:#fff; border-radius:9px; font-weight:700; cursor:pointer; }\
+  .sx-note{ font-size:12px; color:'+SOFT+'; margin-top:8px; line-height:1.5; }\
+  .sx-empty{ text-align:center; color:'+SOFT+'; padding:28px 10px; font-size:14px; }\
+  ';
+
+  /* ----- grafik batang SVG (tanpa library) ----- */
+  function barChart(labels, series, opt){
+    opt = opt || {}; var W = 640, H = 230, pl = 8, pr = 8, pt = 22, pb = 28, n = labels.length; if(!n) return '';
+    var max = 0; series.forEach(function(s){ s.values.forEach(function(v){ if(v > max) max = v; }); }); if(max <= 0) max = 1;
+    var gw = (W - pl - pr) / n, bw = Math.min(34, gw / (series.length + 0.6) * 0.9), out = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" style="display:block;max-width:100%;">';
+    for(var g = 0; g <= 3; g++){ var y = pt + (H - pt - pb) * (1 - g / 3); out += '<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y+'" y2="'+y+'" stroke="'+LINE+'" stroke-width="1"/>'; }
+    var showVals = n <= 12, step = n > 16 ? Math.ceil(n / 8) : 1;
+    labels.forEach(function(lb, i){
+      var cx = pl + gw * i + gw / 2, x0 = cx - (bw * series.length) / 2;
+      series.forEach(function(s, k){ var v = s.values[i] || 0, h = (H - pt - pb) * v / max, x = x0 + k * bw, y = H - pb - h;
+        if(v > 0) out += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+(bw-2).toFixed(1)+'" height="'+Math.max(h,1).toFixed(1)+'" rx="2" fill="'+s.color+'"/>';
+        if(showVals && v > 0 && (series.length === 1 || k === series.length - 1)) out += '<text x="'+(x+(bw-2)/2).toFixed(1)+'" y="'+(y-4).toFixed(1)+'" font-size="'+(n > 8 ? 9 : 10)+'" text-anchor="middle" fill="'+INK+'">'+fShort(v)+'</text>'; });
+      if(i % step === 0) out += '<text x="'+cx.toFixed(1)+'" y="'+(H-9)+'" font-size="11" text-anchor="middle" fill="'+SOFT+'">'+esc(lb)+'</text>';
+    });
+    return out + '</svg>';
+  }
+  function legend(items){ return '<div class="sx-leg">' + items.map(function(i){ return '<span><i style="background:'+i[1]+'"></i>'+esc(i[0])+'</span>'; }).join('') + '</div>'; }
+  function card(l, v, s){ return '<div class="sx-card"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s ? '<div class="s">'+s+'</div>' : '')+'</div>'; }
+
+  window.__salesApp = function(D, onLogout){
+    var yrs = (D.meta && D.meta.years) || [2025, 2026], cur = Math.max.apply(null, yrs), ly = cur - 1;
+    var latestM = num(D.meta && D.meta.latestMonth2026) || 12, latestD = String((D.meta && D.meta.latestDate2026) || D.sales.to || '').slice(0,10);
+    var dFrom = D.sales && D.sales.from ? String(D.sales.from).slice(0,10) : cur + '-01-01', dTo = (D.sales && D.sales.to ? String(D.sales.to).slice(0,10) : latestD) || cur + '-12-31';
+    var S = {per:'ytd', sem:latestM > 6 ? 2 : 1, q:Math.ceil(latestM / 3), month:latestM, from:dTo, to:dTo, tab:'me', find:'', sort:'amt', cat:'', limit:50};
+    try{ var sv = JSON.parse(sessionStorage.getItem('sx_state') || 'null'); if(sv){ for(var k in sv) if(k in S) S[k] = sv[k]; } }catch(e){}
+    var root = document.getElementById('sx'); if(!root){ root = document.createElement('div'); root.id = 'sx'; document.body.appendChild(root); }
+    if(!document.getElementById('sx-css')){ var st = document.createElement('style'); st.id = 'sx-css'; st.textContent = CSS; document.head.appendChild(st); }
+    var U = D.user;
+
+    function monthsOf(){
+      var all = []; for(var m = 1; m <= latestM; m++) all.push(m);
+      if(S.per === 'ytd') return all;
+      if(S.per === 'sem') return all.filter(function(m){ return S.sem === 1 ? m <= 6 : m > 6; });
+      if(S.per === 'q') return all.filter(function(m){ return Math.ceil(m / 3) === S.q; });
+      if(S.per === 'month') return [S.month];
+      return [];
+    }
+    function periodLabel(){
+      if(S.per === 'ytd') return 'YTD ' + cur + ' (Jan–' + MS[latestM-1] + ')';
+      if(S.per === 'sem') return 'Semester ' + S.sem + ' ' + cur;
+      if(S.per === 'q') return 'Kuartal ' + S.q + ' ' + cur;
+      if(S.per === 'month') return MN[S.month-1] + ' ' + cur;
+      return S.from === S.to ? fDate(S.from) : fDate(S.from) + ' – ' + fDate(S.to);
+    }
+    function inRange(r){ if(r.y !== cur || !r.d) return false; var ds = cur + '-' + String(r.m).padStart(2,'0') + '-' + String(r.d).padStart(2,'0'); return ds >= S.from && ds <= S.to; }
+    function sel(rows, year, ms){ var set = {}; ms.forEach(function(m){ set[m] = 1; }); return rows.filter(function(r){ return r.y === year && set[r.m]; }); }
+    function sum(rows, f){ var t = 0; rows.forEach(function(r){ t += num(r[f]); }); return t; }
+
+    /* ---------- tab: Sales Saya ---------- */
+    function meHtml(){
+      var rows = D.spFact, isDate = S.per === 'date', ms = monthsOf();
+      var A = isDate ? rows.filter(inRange) : sel(rows, cur, ms), B = isDate ? [] : sel(rows, ly, ms);
+      var amt = sum(A, 'amt'), amtLY = sum(B, 'amt'), inv = sum(A, 'inv'), pbA = sum(A, 'pbAmt'), pr = sum(A, 'projectAmt'), wa = sum(A, 'whatsappAmt'), prot = sum(A, 'protectionQty');
+      var h = '<div class="sx-cards">'
+        + card('Sales Value', fRp(amt), isDate ? periodLabel() : 'vs ' + ly + ': ' + fRp(amtLY) + ' ' + gHtml(growth(amt, amtLY)))
+        + card('Invoice', fN(inv), inv ? 'Rata-rata ' + fRp(amt / inv) + '/invoice' : '')
+        + card('Private Brand', fRp(pbA), amt ? (pbA / amt * 100).toFixed(1).replace('.', ',') + '% dari sales' : '')
+        + card('Sales Project', fRp(pr), 'WhatsApp: ' + fRp(wa))
+        + '</div>';
+      if(prot) h += '<div class="sx-note">Protection: <b>' + fN(prot) + '</b> qty pada periode ini.</div>';
+      // grafik + tabel
+      if(isDate){
+        var byDay = {}; A.forEach(function(r){ var k = String(r.m).padStart(2,'0') + '-' + String(r.d).padStart(2,'0'); (byDay[k] = byDay[k] || {amt:0, inv:0, pb:0}); byDay[k].amt += num(r.amt); byDay[k].inv += num(r.inv); byDay[k].pb += num(r.pbAmt); });
+        var keys = Object.keys(byDay).sort();
+        if(!keys.length) return h + '<div class="sx-panel"><div class="sx-empty">Tidak ada transaksi pada tanggal ini.</div></div>';
+        var showKeys = keys.length > 62 ? null : keys;
+        h += '<div class="sx-panel"><div class="sx-ph">Sales per Hari <small>' + esc(periodLabel()) + '</small></div>' + (showKeys ? barChart(keys.map(function(k){ return +k.slice(3); }), [{name:'Sales', color:C_CUR, values:keys.map(function(k){ return byDay[k].amt; })}]) : '<div class="sx-note">Rentang lebih dari 62 hari — lihat tabel.</div>') + '</div>';
+        h += '<div class="sx-panel"><div class="sx-ph">Rincian Harian</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Tanggal</th><th>Sales</th><th>Invoice</th><th>Private Brand</th></tr></thead><tbody>'
+          + keys.slice().reverse().map(function(k){ var o = byDay[k]; return '<tr><td>' + fDate(cur + '-' + k) + '</td><td>' + fRp(o.amt) + '</td><td>' + fN(o.inv) + '</td><td>' + fRp(o.pb) + '</td></tr>'; }).join('')
+          + '<tr class="tot"><td>Total</td><td>' + fRp(amt) + '</td><td>' + fN(inv) + '</td><td>' + fRp(pbA) + '</td></tr></tbody></table></div></div>';
+        return h;
+      }
+      var cA = ms.map(function(m){ return sum(A.filter(function(r){ return r.m === m; }), 'amt'); }), cB = ms.map(function(m){ return sum(B.filter(function(r){ return r.m === m; }), 'amt'); });
+      h += '<div class="sx-panel"><div class="sx-ph">Sales per Bulan <small>' + esc(periodLabel()) + '</small></div>' + legend([[String(cur), C_CUR], [String(ly), C_LY]]) + barChart(ms.map(function(m){ return MS[m-1]; }), [{name:String(ly), color:C_LY, values:cB}, {name:String(cur), color:C_CUR, values:cA}]) + '</div>';
+      h += '<div class="sx-panel"><div class="sx-ph">Rincian per Bulan</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Bulan</th><th>' + cur + '</th><th>' + ly + '</th><th>Growth</th><th>Invoice</th></tr></thead><tbody>'
+        + ms.map(function(m, i){ var iv = sum(A.filter(function(r){ return r.m === m; }), 'inv'); return '<tr><td>' + MN[m-1] + '</td><td>' + fRp(cA[i]) + '</td><td>' + fRp(cB[i]) + '</td><td>' + gHtml(growth(cA[i], cB[i])) + '</td><td>' + (iv ? fN(iv) : '–') + '</td></tr>'; }).join('')
+        + '<tr class="tot"><td>Total</td><td>' + fRp(amt) + '</td><td>' + fRp(amtLY) + '</td><td>' + gHtml(growth(amt, amtLY)) + '</td><td>' + (inv ? fN(inv) : '–') + '</td></tr></tbody></table></div>'
+        + '<div class="sx-note">Pembanding (' + ly + ') = bulan yang sama tahun lalu. Data invoice tersedia mulai ' + cur + '.</div></div>';
+      return h;
+    }
+
+    var _dc = new Map();
+    function derive(rows){ if(_dc.has(rows)) return _dc.get(rows); var o = rows.map(function(r){ var m = D.itemMeta[r.item] || {}; return {y:r.y, m:r.m, d:r.d, cat:m.cat || '(lainnya)', subcat:m.subcat || '', brand:m.brand || '(lainnya)', mb:m.mb || '', amt:r.amt, qty:r.qty}; }); _dc.set(rows, o); return o; }
+    /* ---------- tab: Master Brand ---------- */
+    function brandHtml(){
+      if(D.brandMode === 'none') return '<div class="sx-panel"><div class="sx-empty">Master brand <b>' + esc(U.mb || '-') + '</b> tidak memiliki data brand di dashboard, sehingga hanya data Sales Anda yang tersedia.</div></div>';
+      var isPB = D.brandMode === 'pb', isDate = S.per === 'date', ms = monthsOf();
+      var title = isPB ? 'Private + Exclusive Brand ' + (U.zona || '') : D.brandNames.join(' + ');
+      var amtF = 'amt', qtyF = 'qty';
+      var monthly = isPB ? derive(D.itemFact) : D.brandFact, daily = isPB ? derive(D.itemDayFact) : D.brandDayFact;
+      var A, B = [];
+      if(isDate) A = daily.filter(inRange); else { A = sel(monthly, cur, ms); B = sel(monthly, ly, ms); }
+      var amt = sum(A, amtF), amtLY = sum(B, amtF), qty = sum(A, qtyF), qtyLY = sum(B, qtyF), hasQty = !isDate || isPB;
+      var h = '<div class="sx-note" style="margin:0 0 8px;">' + (isPB ? 'Penjualan <b>Private Brand + Exclusive Brand</b> (Master Type Brand) pada <b>' + esc(U.zona || '-') + '</b> di seluruh toko, per brand (bukan hanya penjualan Anda).' : 'Penjualan master brand <b>' + esc(title) + '</b> di seluruh toko (bukan hanya penjualan Anda).') + '</div><div class="sx-cards">'
+        + card('Sales ' + esc(title), fRp(amt), isDate ? periodLabel() : 'vs ' + ly + ': ' + fRp(amtLY) + ' ' + gHtml(growth(amt, amtLY)))
+        + (hasQty ? card('Qty', fN(qty), isDate ? '' : 'vs ' + ly + ': ' + fN(qtyLY) + ' ' + gHtml(growth(qty, qtyLY))) : '')
+        + (U.spId && D.spFact ? card('Sales Saya / Brand', amt ? (sum(isDate ? D.spFact.filter(inRange) : sel(D.spFact, cur, ms), 'amt') / amt * 100).toFixed(1).replace('.', ',') + '%' : '–', 'porsi penjualan Anda') : '')
+        + '</div>';
+      if(!A.length) return h + '<div class="sx-panel"><div class="sx-empty">Tidak ada data brand pada periode ini.</div></div>';
+      if(isDate){
+        var byDay = {}; A.forEach(function(r){ var k = String(r.m).padStart(2,'0') + '-' + String(r.d).padStart(2,'0'); byDay[k] = (byDay[k] || 0) + num(r[amtF]); });
+        var keys = Object.keys(byDay).sort();
+        if(keys.length <= 62) h += '<div class="sx-panel"><div class="sx-ph">Sales Brand per Hari <small>' + esc(periodLabel()) + '</small></div>' + barChart(keys.map(function(k){ return +k.slice(3); }), [{name:'Sales', color:C_CUR, values:keys.map(function(k){ return byDay[k]; })}]) + '</div>';
+      } else {
+        var cA = ms.map(function(m){ return sum(A.filter(function(r){ return r.m === m; }), amtF); }), cB = ms.map(function(m){ return sum(B.filter(function(r){ return r.m === m; }), amtF); });
+        h += '<div class="sx-panel"><div class="sx-ph">Sales Brand per Bulan <small>' + esc(periodLabel()) + '</small></div>' + legend([[String(cur), C_CUR], [String(ly), C_LY]]) + barChart(ms.map(function(m){ return MS[m-1]; }), [{name:String(ly), color:C_LY, values:cB}, {name:String(cur), color:C_CUR, values:cA}]) + '</div>';
+      }
+      // per kategori
+      function group(rows, f){ var o = {}; rows.forEach(function(r){ var k = r[f] || '(lainnya)'; o[k] = (o[k] || 0) + num(r[amtF]); }); return o; }
+      var gA = group(A, 'cat'), gB = group(B, 'cat'), cats = Object.keys(gA).sort(function(a, b){ return gA[b] - gA[a]; });
+      h += '<div class="sx-panel"><div class="sx-ph">Per Kategori <small>' + esc(periodLabel()) + '</small></div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Kategori</th><th>Sales</th>' + (isDate ? '<th>Porsi</th>' : '<th>' + ly + '</th><th>Growth</th>') + '</tr></thead><tbody>'
+        + cats.map(function(c){ return '<tr><td>' + esc(c) + '</td><td>' + fRp(gA[c]) + '</td>' + (isDate ? '<td>' + (amt ? (gA[c] / amt * 100).toFixed(1).replace('.', ',') + '%' : '–') + '</td>' : '<td>' + fRp(gB[c] || 0) + '</td><td>' + gHtml(growth(gA[c], gB[c] || 0)) + '</td>') + '</tr>'; }).join('')
+        + '<tr class="tot"><td>Total</td><td>' + fRp(amt) + '</td>' + (isDate ? '<td></td>' : '<td>' + fRp(amtLY) + '</td><td>' + gHtml(growth(amt, amtLY)) + '</td>') + '</tr></tbody></table></div></div>';
+      if(isPB){
+        var bA = {}, bB = {}, bm = {}; A.forEach(function(r){ var k = r.brand; bA[k] = (bA[k] || 0) + num(r.amt); bm[k] = r.mb; }); B.forEach(function(r){ var k = r.brand; bB[k] = (bB[k] || 0) + num(r.amt); });
+        var bl = Object.keys(bA).sort(function(a, b){ return bA[b] - bA[a]; }).slice(0, 25);
+        h += '<div class="sx-panel"><div class="sx-ph">Sales per Brand <small>maks. 25</small></div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Brand</th><th>Sales</th>' + (isDate ? '<th>Porsi</th>' : '<th>' + ly + '</th><th>Growth</th>') + '</tr></thead><tbody>'
+          + bl.map(function(k){ return '<tr><td><b>' + esc(k) + '</b>' + (bm[k] ? '<div style="font-size:11.5px;color:' + SOFT + ';">' + esc(bm[k]) + '</div>' : '') + '</td><td>' + fRp(bA[k]) + '</td>' + (isDate ? '<td>' + (amt ? (bA[k] / amt * 100).toFixed(1).replace('.', ',') + '%' : '–') + '</td>' : '<td>' + fRp(bB[k] || 0) + '</td><td>' + gHtml(growth(bA[k], bB[k] || 0)) + '</td>') + '</tr>'; }).join('') + '</tbody></table></div></div>';
+      }
+      if(!isDate && !isPB){
+        var sA = {}, sB = {}; A.forEach(function(r){ var k = (r.subcat || '(lainnya)'); sA[k] = (sA[k] || 0) + num(r.amt); }); B.forEach(function(r){ var k = (r.subcat || '(lainnya)'); sB[k] = (sB[k] || 0) + num(r.amt); });
+        var subs = Object.keys(sA).sort(function(a, b){ return sA[b] - sA[a]; }).slice(0, 15);
+        h += '<div class="sx-panel"><div class="sx-ph">Top Sub Category <small>maks. 15</small></div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Sub Category</th><th>Sales</th><th>' + ly + '</th><th>Growth</th></tr></thead><tbody>'
+          + subs.map(function(c){ return '<tr><td>' + esc(c) + '</td><td>' + fRp(sA[c]) + '</td><td>' + fRp(sB[c] || 0) + '</td><td>' + gHtml(growth(sA[c], sB[c] || 0)) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
+      }
+      return h;
+    }
+
+
+    /* ---------- tab: Item Detail master brand ---------- */
+    function itemRows(){
+      var isDate = S.per === 'date', ms = isDate ? null : monthsOf(), A = {}, B = {};
+      if(isDate) D.itemDayFact.forEach(function(r){ if(inRange(r)){ var o = A[r.item] || (A[r.item] = {amt:0, qty:0}); o.amt += num(r.amt); o.qty += num(r.qty); } });
+      else D.itemFact.forEach(function(r){
+        var inM = ms.indexOf(r.m) >= 0; if(r.y === cur && inM){ var o = A[r.item] || (A[r.item] = {amt:0, qty:0}); o.amt += num(r.amt); o.qty += num(r.qty); } else if(r.y === ly && inM){ var p = B[r.item] || (B[r.item] = {amt:0, qty:0}); p.amt += num(r.amt); p.qty += num(r.qty); }
+      });
+      var ids = {}; Object.keys(A).forEach(function(k){ ids[k] = 1; }); Object.keys(B).forEach(function(k){ ids[k] = 1; });
+      return Object.keys(ids).map(function(id){ var m = D.itemMeta[id] || {}, a = A[id] || {amt:0, qty:0}, b = B[id] || {amt:0, qty:0}; return {id:id, name:m.name || id, cat:m.cat || '', sub:m.subcat || '', brand:m.brand || '', amt:a.amt, qty:a.qty, lyAmt:b.amt, lyQty:b.qty, g:growth(a.amt, b.amt)}; });
+    }
+    function itemHtml(){
+      if(D.brandMode !== 'brand' && D.brandMode !== 'pb') return '<div class="sx-panel"><div class="sx-empty">Detail item tidak tersedia untuk master brand <b>' + esc(U.mb || '-') + '</b>.</div></div>';
+      var isDate = S.per === 'date', all = itemRows(), cats = {}; all.forEach(function(r){ if(r.cat) cats[r.cat] = 1; });
+      var tot = {amt:0, qty:0, ly:0}; all.forEach(function(r){ tot.amt += r.amt; tot.qty += r.qty; tot.ly += r.lyAmt; });
+      var h = '<div class="sx-note" style="margin:0 0 8px;">Penjualan item ' + (D.brandMode === 'pb' ? '<b>Private + Exclusive Brand ' + esc(U.zona || '') + '</b>' : 'master brand <b>' + esc(D.brandNames.join(' + ')) + '</b>') + ' di seluruh toko · ' + esc(periodLabel()) + '</div>'
+        + '<div class="sx-cards">' + card('Item Terjual', fN(all.filter(function(r){ return r.amt || r.qty; }).length), 'dari ' + fN(Object.keys(D.itemMeta).length) + ' item') + card('Sales', fRp(tot.amt), isDate ? '' : 'vs ' + ly + ': ' + fRp(tot.ly) + ' ' + gHtml(growth(tot.amt, tot.ly))) + card('Qty', fN(tot.qty), '') + '</div>'
+        + '<div class="sx-panel"><div class="sx-ph">Detail Item <small id="sx-itcount"></small></div>'
+        + '<input class="sx-find" id="sx-find" type="search" placeholder="Cari kode / nama item…" value="' + esc(S.find) + '">'
+        + '<div class="sx-sub" style="margin:0 0 8px;"><select id="sx-cat"><option value="">Semua kategori</option>' + Object.keys(cats).sort().map(function(c){ return '<option value="' + esc(c) + '"' + (S.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>'
+        + '<select id="sx-sort"><option value="amt"' + (S.sort === 'amt' ? ' selected' : '') + '>Urut: Sales terbesar</option><option value="qty"' + (S.sort === 'qty' ? ' selected' : '') + '>Urut: Qty terbesar</option><option value="g"' + (S.sort === 'g' ? ' selected' : '') + '>Urut: Growth tertinggi</option><option value="gl"' + (S.sort === 'gl' ? ' selected' : '') + '>Urut: Growth terendah</option></select></div>'
+        + '<div class="sx-tw"><table class="sx-t"><thead><tr><th>Item</th><th>Sales</th><th>Qty</th>' + (isDate ? '' : '<th>' + ly + '</th><th>Growth</th>') + '</tr></thead><tbody id="sx-itbody"></tbody></table></div><div id="sx-itmore"></div>'
+        + '<div class="sx-note">' + (isDate ? 'Pembanding tahun lalu tidak tersedia untuk filter tanggal. ' : 'Pembanding (' + ly + ') = bulan yang sama tahun lalu. ') + 'Item tanpa penjualan pada periode ini tidak ditampilkan.</div></div>';
+      setTimeout(function(){ fillItems(all); var f = root.querySelector('#sx-find'), c = root.querySelector('#sx-cat'), so = root.querySelector('#sx-sort');
+        if(f) f.oninput = function(){ S.find = f.value; S.limit = 50; fillItems(all); };
+        if(c) c.onchange = function(){ S.cat = c.value; S.limit = 50; fillItems(all); };
+        if(so) so.onchange = function(){ S.sort = so.value; S.limit = 50; fillItems(all); }; }, 0);
+      return h;
+    }
+    function fillItems(all){
+      var q = S.find.trim().toLowerCase(), rows = all.filter(function(r){ return (r.amt || r.qty) && (!S.cat || r.cat === S.cat) && (!q || r.id.toLowerCase().indexOf(q) >= 0 || r.name.toLowerCase().indexOf(q) >= 0); });
+      var key = S.sort; rows.sort(function(a, b){ if(key === 'g') return (b.g == null ? -1e9 : b.g) - (a.g == null ? -1e9 : a.g); if(key === 'gl') return (a.g == null ? 1e9 : a.g) - (b.g == null ? 1e9 : b.g); return b[key] - a[key]; });
+      var tb = root.querySelector('#sx-itbody'), cnt = root.querySelector('#sx-itcount'), more = root.querySelector('#sx-itmore'); if(!tb) return;
+      tb.innerHTML = rows.slice(0, S.limit).map(function(r){ return '<tr><td><b>' + esc(r.name) + '</b><div style="font-size:11.5px;color:' + SOFT + ';">' + esc(r.id) + (r.sub ? ' · ' + esc(r.sub) : '') + '</div></td><td>' + fRp(r.amt) + '</td><td>' + fN(r.qty) + '</td>' + (S.per === 'date' ? '' : '<td>' + fRp(r.lyAmt) + '</td><td>' + gHtml(r.g) + '</td>') + '</tr>'; }).join('') || '<tr><td colspan="5" style="text-align:center;color:' + SOFT + ';padding:18px;">Tidak ada item.</td></tr>';
+      if(cnt) cnt.textContent = fN(Math.min(S.limit, rows.length)) + ' dari ' + fN(rows.length) + ' item';
+      if(more){ more.innerHTML = rows.length > S.limit ? '<button class="sx-more">Tampilkan 50 lagi</button>' : ''; var bt = more.querySelector('button'); if(bt) bt.onclick = function(){ S.limit += 50; fillItems(all); }; }
+    }
+
+    function controls(){
+      var seg = [['ytd','YTD'],['sem','Semester'],['q','Kuartal'],['month','Bulan'],['date','Tanggal']];
+      var h = '<div class="sx-seg">' + seg.map(function(s){ return '<button data-per="' + s[0] + '" class="' + (S.per === s[0] ? 'on' : '') + '">' + s[1] + '</button>'; }).join('') + '</div><div class="sx-sub">';
+      if(S.per === 'sem') h += '<select id="sx-sem"><option value="1"' + (S.sem === 1 ? ' selected' : '') + '>Semester 1 (Jan–Jun)</option>' + (latestM > 6 ? '<option value="2"' + (S.sem === 2 ? ' selected' : '') + '>Semester 2 (Jul–Des)</option>' : '') + '</select>';
+      if(S.per === 'q'){ h += '<select id="sx-q">'; for(var q = 1; q <= Math.ceil(latestM / 3); q++) h += '<option value="' + q + '"' + (S.q === q ? ' selected' : '') + '>Kuartal ' + q + '</option>'; h += '</select>'; }
+      if(S.per === 'month'){ h += '<select id="sx-m">'; for(var m = 1; m <= latestM; m++) h += '<option value="' + m + '"' + (S.month === m ? ' selected' : '') + '>' + MN[m-1] + '</option>'; h += '</select>'; }
+      if(S.per === 'date') h += '<label>Dari <input type="date" id="sx-from" min="' + dFrom + '" max="' + dTo + '" value="' + S.from + '"></label><label>s/d <input type="date" id="sx-to" min="' + dFrom + '" max="' + dTo + '" value="' + S.to + '"></label>';
+      h += '<span style="color:' + SOFT + ';font-size:12.5px;">' + esc(periodLabel()) + '</span></div>';
+      return h;
+    }
+
+    function draw(){
+      try{ sessionStorage.setItem('sx_state', JSON.stringify(S)); }catch(e){}
+      root.innerHTML = '<div class="sx-top"><div class="sx-top-in"><div class="sx-row"><div><div class="sx-name">' + esc(U.name) + '</div><div class="sx-id">' + esc(U.spId) + ' · Mitra10 Yogyakarta</div></div><button class="sx-out" id="sx-out">Keluar</button></div>'
+        + '<div class="sx-chips">' + (U.zona ? '<span class="sx-chip">Zona: <b>' + esc(U.zona) + '</b></span>' : '') + '<span class="sx-chip">Master Brand: <b>' + esc(U.mb || '-') + '</b></span>' + (U.tl ? '<span class="sx-chip">TL: <b>' + esc(U.tl) + '</b></span>' : '') + '<span class="sx-chip">Data s/d <b>' + esc(fDate(dTo)) + '</b></span></div></div></div>'
+        + '<div class="sx-bar"><div class="sx-wrap" style="padding:0;">' + controls() + '</div></div>'
+        + '<div class="sx-wrap"><div class="sx-tabs"><button data-tab="me" class="' + (S.tab === 'me' ? 'on' : '') + '">Sales Saya</button><button data-tab="brand" class="' + (S.tab === 'brand' ? 'on' : '') + '">Master Brand' + '</button>' + ((D.brandMode === 'brand' || D.brandMode === 'pb') ? '<button data-tab="item" class="' + (S.tab === 'item' ? 'on' : '') + '">Item Detail</button>' : '') + '</div>'
+        + (S.tab === 'me' ? meHtml() : S.tab === 'item' && (D.brandMode === 'brand' || D.brandMode === 'pb') ? itemHtml() : brandHtml()) + '<div class="sx-note" style="text-align:center;margin-top:18px;">Anda hanya dapat melihat data Sales Anda dan master brand Anda.</div></div>';
+      root.querySelector('#sx-out').onclick = onLogout;
+      root.querySelectorAll('[data-per]').forEach(function(b){ b.onclick = function(){ S.per = b.dataset.per; draw(); }; });
+      root.querySelectorAll('[data-tab]').forEach(function(b){ b.onclick = function(){ S.tab = b.dataset.tab; draw(); window.scrollTo(0, 0); }; });
+      function bind(id, key){ var el = root.querySelector(id); if(el) el.onchange = function(){ S[key] = +el.value; draw(); }; }
+      bind('#sx-sem', 'sem'); bind('#sx-q', 'q'); bind('#sx-m', 'month');
+      var f = root.querySelector('#sx-from'), t = root.querySelector('#sx-to');
+      if(f && t){ f.onchange = function(){ if(f.value){ S.from = f.value; if(S.to < S.from) S.to = S.from; draw(); } }; t.onchange = function(){ if(t.value){ S.to = t.value; if(S.from > S.to) S.from = S.to; draw(); } }; }
+    }
+    draw();
+  };
+})();
+
+/* ===== Mode website: login, data dari server, penyimpanan bersama ===== */
 (function(){
   var TOKEN_KEY = 'm10_token', ROLE = null, META_VER = '', LAST_META = null, SID = null, BUILD = '';
   window.__REV = '0';
@@ -409,8 +671,8 @@ body.role-viewer #nav-customer{ display:none !important; }
         d.innerHTML = '<form style="background:#fff;border-radius:14px;padding:26px 24px;width:100%;max-width:370px;box-shadow:0 20px 60px rgba(0,0,0,.4);">'
           + '<div style="font-weight:800;font-size:17px;color:#17262E;">PERFORMANCE DASHBOARD</div><div style="font-size:12.5px;color:#6b6f6a;margin:2px 0 6px;">Mitra10 Yogyakarta</div>'
           + (mode === 'login' ? '<div style="display:flex;gap:6px;margin:12px 0 2px;"><button type="button" data-who="user" style="flex:1;padding:9px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;cursor:pointer;background:' + (who==='user' ? '#17262E;color:#fff' : '#fff;color:#444') + ';">Pengguna</button><button type="button" data-who="admin" style="flex:1;padding:9px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;cursor:pointer;background:' + (who==='admin' ? '#D9720B;color:#241500' : '#fff;color:#444') + ';">Admin</button></div>' : '')
-          + (mode === 'req' ? '<label style="'+LB+'">Nama lengkap</label><input id="site-name" autocomplete="name" style="'+IN+'">' : '')
-          + '<label style="'+LB+'">User / Email</label><input id="site-user-in" autocomplete="username" autocapitalize="none" spellcheck="false" style="'+IN+'">'
+          + (mode === 'req' ? '<label style="'+LB+'">Nama <span style="font-weight:500;color:#777;">(cukup salah satu kata dari nama Anda)</span></label><input id="site-name" autocomplete="name" placeholder="mis. Satriyo" style="'+IN+'">' : '')
+          + '<label style="'+LB+'">' + (mode === 'req' ? 'Salesperson ID <span style="font-weight:500;color:#777;">(wajib)</span>' : 'User / Salesperson ID') + '</label><input id="site-user-in" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="' + (mode === 'req' ? 'S80000-0000000449' : '') + '" style="'+IN+'">'
           + '<label style="'+LB+'">Password' + (mode === 'req' ? ' (min. 8 karakter)' : '') + '</label><input id="site-pw" type="password" autocomplete="' + (mode === 'req' ? 'new-password' : 'current-password') + '" style="'+IN+'">'
           + '<div id="site-err" style="color:' + (ok ? '#1B7F4B' : '#B23A2E') + ';font-size:12.5px;min-height:18px;margin-top:8px;">' + (msg || '') + '</div>'
           + '<button type="submit" style="width:100%;margin-top:6px;padding:12px;border:0;border-radius:9px;background:#D9720B;color:#241500;font-weight:800;font-size:15px;cursor:pointer;">' + (mode === 'req' ? 'Kirim Permintaan Akses' : 'Masuk') + '</button>'
@@ -483,6 +745,14 @@ body.role-viewer #nav-customer{ display:none !important; }
     window.__USER = s.user; window.__NAME = s.name; window.__CANMANAGE = !!s.canManage;
     ROLE = s.role; window.__REV = s.rev || '0'; window.__ROLE = ROLE;
     document.body.classList.add('role-' + (ROLE || 'viewer'));
+    if(ROLE === 'sales'){
+      say('Memuat data Anda…');
+      var rs = await api('scoped'); if(!rs.ok) throw new Error('Gagal memuat data Anda (HTTP ' + rs.status + ')');
+      var SD = await rs.json();
+      window.__salesApp(SD, function(){ setTok(''); try{ sessionStorage.removeItem('sx_state'); }catch(e){} location.reload(); });
+      if(L) L.remove(); startSiteUi();
+      return new Promise(function(){});
+    }
     say('Mengunduh data terbaru dari server…');
     var man = await (await api('data/manifest')).json(); BUILD = man.build || '1';
     var names = Object.keys(man.parts), jobs = [];
@@ -504,13 +774,14 @@ body.role-viewer #nav-customer{ display:none !important; }
     d.style.cssText = 'position:fixed;inset:0;z-index:99995;background:rgba(10,18,22,.6);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;font-family:system-ui,-apple-system,sans-serif;';
     document.body.appendChild(d);
     var BT = 'border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;margin:2px 2px 2px 0;';
-    var msg = '';
+    var msg = '', SM = null, LASTRES = null, SMAP = {};
     async function call(path, method, body){
       var r = await api('admin/users' + path, {method: method, headers: {'content-type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
       var j = await r.json().catch(function(){ return {}; }); if(!r.ok){ msg = j.error || ('Gagal (HTTP ' + r.status + ')'); return null; } msg = ''; return j;
     }
     async function load(){ var r = await api('admin/users'); return r.ok ? r.json() : null; }
     async function draw(data){
+      if(data && !SM){ var rsm = await api('admin/users/salesmap'); SM = rsm.ok ? await rsm.json() : {list: [], taken: []}; SMAP = {}; SM.list.forEach(function(x){ SMAP[x.id.toLowerCase()] = x; }); }
       if(!data){ d.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;">Gagal memuat. <button id="uc">Tutup</button></div>'; d.querySelector('#uc').onclick = function(){ d.remove(); }; return; }
       var h = '<div style="background:#fff;border-radius:14px;padding:18px;width:100%;max-width:760px;margin:auto 0;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><div style="font-weight:800;font-size:17px;color:#17262E;">Kelola Pengguna</div><button id="uc" style="'+BT+'background:#eee;">Tutup ✕</button></div>'
@@ -518,11 +789,11 @@ body.role-viewer #nav-customer{ display:none !important; }
         + (msg ? '<div style="color:#B23A2E;font-size:13px;margin-bottom:8px;">' + esc(msg) + '</div>' : '');
       h += '<div style="font-weight:700;margin:10px 0 4px;">Permintaan akses (' + data.pending.length + ')</div>';
       if(!data.pending.length) h += '<div style="font-size:13px;color:#777;">Tidak ada permintaan.</div>';
-      data.pending.forEach(function(p){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;"><div><b>' + esc(p.name) + '</b> <span style="color:#777;">(' + esc(p.username) + ')</span><div style="font-size:11.5px;color:#888;">' + esc((p.requestedAt || '').slice(0,16).replace('T',' ')) + '</div></div><div><button data-a="approve" data-r="viewer" data-u="' + esc(p.username) + '" style="'+BT+'background:#D9720B;color:#241500;">Setujui Viewer</button><button data-a="approve" data-r="admin" data-u="' + esc(p.username) + '" style="'+BT+'background:#17262E;color:#fff;">Setujui Admin</button><button data-a="reject" data-u="' + esc(p.username) + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Tolak</button></div></div>'; });
+      data.pending.forEach(function(p){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;"><div><b>' + esc(p.name) + '</b> <span style="color:#777;">(' + esc(p.username) + ')</span><div style="font-size:11.5px;color:#888;">' + esc((p.requestedAt || '').slice(0,16).replace('T',' ')) + '</div></div><div><button data-a="approve" data-r="viewer" data-u="' + esc(p.username) + '" style="'+BT+'background:#D9720B;color:#241500;">Setujui Viewer</button><button data-a="approve" data-r="admin" data-u="' + esc(p.username) + '" style="'+BT+'background:#17262E;color:#fff;">Setujui Admin</button>' + (SMAP[p.username] ? '<button data-a="approve" data-r="sales" data-u="' + esc(p.username) + '" style="'+BT+'background:#1B7F4B;color:#fff;">Setujui Salesperson (' + esc(SMAP[p.username].mb) + ')</button>' : '') + '<button data-a="reject" data-u="' + esc(p.username) + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Tolak</button></div></div>'; });
       h += '<div style="font-weight:700;margin:14px 0 4px;">Pengguna aktif (' + data.users.length + ')</div>';
       if(!data.users.length) h += '<div style="font-size:13px;color:#777;">Belum ada pengguna selain admin utama.</div>';
-      data.users.forEach(function(u){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div><b>' + esc(u.name) + '</b> <span style="color:#777;">(' + esc(u.username) + ')</span> · ' + (u.role === 'admin' ? 'Admin' : 'Viewer') + (u.disabled ? ' · <span style="color:#B23A2E;">nonaktif</span>' : '') + '</div><div>'
-        + '<button data-a="role" data-r="' + (u.role === 'admin' ? 'viewer' : 'admin') + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Jadikan ' + (u.role === 'admin' ? 'Viewer' : 'Admin') + '</button>'
+      data.users.forEach(function(u){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div><b>' + esc(u.name) + '</b> <span style="color:#777;">(' + esc(u.username) + ')</span> · ' + (u.role === 'admin' ? 'Admin' : u.role === 'sales' ? 'Salesperson · ' + esc(u.mb || '') : 'Viewer') + (u.disabled ? ' · <span style="color:#B23A2E;">nonaktif</span>' : '') + '</div><div>'
+        + (u.role === 'sales' ? '' : '<button data-a="role" data-r="' + (u.role === 'admin' ? 'viewer' : 'admin') + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Jadikan ' + (u.role === 'admin' ? 'Viewer' : 'Admin') + '</button>')
         + '<button data-a="toggle" data-d="' + (u.disabled ? 0 : 1) + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">' + (u.disabled ? 'Aktifkan' : 'Nonaktifkan') + '</button>'
         + '<button data-a="pw" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Reset password</button>'
         + '<button data-a="del" data-u="' + esc(u.username) + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Hapus akses</button></div></div>'; });
@@ -532,7 +803,18 @@ body.role-viewer #nav-customer{ display:none !important; }
         + '<input name="password" placeholder="password (min. 8)" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;">'
         + '<select name="role" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><option value="viewer">Viewer</option><option value="admin">Admin</option></select>'
         + '<button type="submit" style="'+BT+'background:#D9720B;color:#241500;padding:10px;">Tambah</button></form>'
-        + '<div style="font-size:11.5px;color:#888;margin-top:10px;">Viewer: melihat semua menu kecuali Data Customer &amp; Upload Data. Admin: semua menu + upload data + Data Customer (kelola pengguna hanya untuk admin utama).</div></div>';
+;
+      h += '<div style="font-weight:700;margin:16px 0 4px;">Akun Salesperson <span style="font-weight:500;color:#777;font-size:12px;">(user = Salesperson ID; hanya melihat data sendiri &amp; master brand-nya)</span></div>';
+      if(LASTRES){ h += '<div style="border:2px solid #1B7F4B;border-radius:10px;padding:10px;margin-bottom:8px;background:#f2fbf6;"><div style="font-weight:700;color:#1B7F4B;">Akun dibuat (' + LASTRES.created.length + ') — catat/unduh password sekarang, tidak ditampilkan lagi</div>'
+        + (LASTRES.skipped && LASTRES.skipped.length ? '<div style="font-size:12px;color:#B23A2E;margin:4px 0;">Dilewati: ' + LASTRES.skipped.map(function(x){ return esc(x.id + ' (' + x.why + ')'); }).join(', ') + '</div>' : '')
+        + '<div style="max-height:220px;overflow:auto;margin:6px 0;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><tr style="text-align:left;"><th>User (ID)</th><th>Nama</th><th>Master Brand</th><th>Password</th></tr>' + LASTRES.created.map(function(c){ return '<tr><td>' + esc(c.id) + '</td><td>' + esc(c.name) + '</td><td>' + esc(c.mb) + '</td><td><b>' + esc(c.password) + '</b></td></tr>'; }).join('') + '</table></div>'
+        + '<button data-a="copyres" style="'+BT+'background:#17262E;color:#fff;">Salin</button><button data-a="csvres" style="'+BT+'background:#D9720B;color:#241500;">Unduh CSV</button><button data-a="closeres" style="'+BT+'background:#eee;">Tutup</button></div>'; }
+      var freeN = SM.list.filter(function(x){ return SM.taken.indexOf(x.id.toLowerCase()) < 0; }).length;
+      h += '<form id="sadd" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;"><input name="id" list="sx-ids" placeholder="Salesperson ID (mis. S80000-0000000401)" autocapitalize="characters" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><datalist id="sx-ids">' + SM.list.map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.name + ' — ' + x.mb) + '</option>'; }).join('') + '</datalist>'
+        + '<input name="password" placeholder="password (kosong = acak)" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><button type="submit" style="'+BT+'background:#D9720B;color:#241500;padding:10px;">Buat Akun Salesperson</button></form>'
+        + '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;">Buat banyak sekaligus</summary><textarea id="sbulk" rows="3" placeholder="Tempel beberapa Salesperson ID (pisahkan dengan spasi / koma / baris baru)" style="width:100%;margin-top:6px;padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;box-sizing:border-box;"></textarea><button data-a="bulk" style="'+BT+'background:#17262E;color:#fff;padding:9px 12px;">Buat dari daftar</button><button data-a="all" style="'+BT+'background:#eee;padding:9px 12px;">Buat untuk SEMUA yang belum punya akun (' + freeN + ')</button></details>';
+      h += '<div style="font-size:11.5px;color:#888;margin-top:10px;">Viewer: melihat semua menu kecuali Data Customer &amp; Upload Data. Admin: semua menu + Upload Data + Data Customer (kelola pengguna hanya untuk admin utama). Salesperson: hanya halaman "Performa Saya" (data sendiri + master brand-nya).</div></div>';
+
       d.innerHTML = h;
       d.querySelector('#uc').onclick = function(){ d.remove(); };
       d.onclick = async function(e){ var t = e.target.closest('button[data-a]'); if(!t) return; var a = t.dataset.a, u = t.dataset.u, res;
@@ -541,8 +823,14 @@ body.role-viewer #nav-customer{ display:none !important; }
         else if(a === 'role') res = await call('/' + encodeURIComponent(u) + '/update', 'POST', {role: t.dataset.r});
         else if(a === 'toggle') res = await call('/' + encodeURIComponent(u) + '/update', 'POST', {disabled: t.dataset.d === '1'});
         else if(a === 'pw'){ var p = prompt('Password baru untuk ' + u + ' (min. 8 karakter):'); if(!p) return; res = await call('/' + encodeURIComponent(u) + '/update', 'POST', {password: p}); }
+        else if(a === 'copyres'){ var tx = 'User (ID)\tNama\tMaster Brand\tPassword\n' + LASTRES.created.map(function(c){ return [c.id, c.name, c.mb, c.password].join('\t'); }).join('\n'); try{ await navigator.clipboard.writeText(tx); alert('Tersalin.'); }catch(er){ prompt('Salin manual:', tx); } return; }
+        else if(a === 'csvres'){ var csv = 'user,nama,master_brand,password\n' + LASTRES.created.map(function(c){ return [c.id, '"' + c.name + '"', '"' + c.mb + '"', c.password].join(','); }).join('\n'); var bl = new Blob([csv], {type:'text/csv'}), an = document.createElement('a'); an.href = URL.createObjectURL(bl); an.download = 'akun_salesperson.csv'; document.body.appendChild(an); an.click(); an.remove(); return; }
+        else if(a === 'closeres'){ LASTRES = null; draw(await load()); return; }
+        else if(a === 'bulk'){ var ids = d.querySelector('#sbulk').value; if(!ids.trim()) return; res = await call('/bulk-sales', 'POST', {ids: ids}); if(res){ LASTRES = {created: res.created, skipped: res.skipped}; SM = null; } }
+        else if(a === 'all'){ var free = SM.list.filter(function(x){ return SM.taken.indexOf(x.id.toLowerCase()) < 0; }).map(function(x){ return x.id; }); if(!free.length) return; if(!confirm('Buat akun untuk ' + free.length + ' Salesperson?')) return; res = await call('/bulk-sales', 'POST', {ids: free}); if(res){ LASTRES = {created: res.created, skipped: res.skipped}; SM = null; } }
         else if(a === 'del'){ if(!confirm('Hapus akses ' + u + ' secara permanen?')) return; res = await call('/' + encodeURIComponent(u), 'DELETE'); }
         draw(res || await load()); };
+      d.querySelector('#sadd').onsubmit = async function(e){ e.preventDefault(); var fd = new FormData(e.target), o = {}; fd.forEach(function(v, k){ o[k] = v; }); var res = await call('/sales', 'POST', o); if(res){ LASTRES = {created: res.created, skipped: []}; SM = null; } draw(res || await load()); };
       d.querySelector('#uadd').onsubmit = async function(e){ e.preventDefault(); var fd = new FormData(e.target), o = {}; fd.forEach(function(v, k){ o[k] = v; }); var res = await call('', 'POST', o); draw(res || await load()); };
     }
     draw(await load());
@@ -937,6 +1225,7 @@ const STATE = {
   trafficFact: [...(SEED.trafficFact||[])], // {y,m,d,budget?,actual} — TY rows have budget, LY rows (y-1) don't
   salesFact: [...SEED.salesFact],       // {y,m,d,cat,amt,qty,pbAmt,pbQty}
   brandFact: [...SEED.brandFact],       // {y,m,cat,subcat,func,brand,amt,qty}
+  itemDayFact: [...(SEED.itemDayFact||[])], // {y,m,d,item,amt,qty} — penjualan item per hari (tahun berjalan)
   itemFact: [...SEED.itemFact],         // {y,m,item,amt,qty}
   itemMeta: {...SEED.itemMeta},         // item -> {name,cat,subcat,func,masterBrand,brand}
   spFact: [...SEED.spFact],             // {y,m,spId,spName,amt,pbAmt,protectionQty,projectAmt,whatsappAmt}
@@ -1079,7 +1368,7 @@ function dcSiteList(){
 // as possible (few large requests, not many small ones — avoids rate limits).
 // ============================================================
 const PERSIST_PREFIX = 'retailpulse_v2_';
-const PERSIST_KEYS = ['salesFact','brandFact','itemFact','itemMeta','spFact','sourceFact','sourceDailyFact','hourFact','brandDayFact','sourceZonaFact','notaFact','notaCatFact','dcAging','dataMeta',
+const PERSIST_KEYS = ['salesFact','brandFact','itemFact','itemDayFact','itemMeta','spFact','sourceFact','sourceDailyFact','hourFact','brandDayFact','sourceZonaFact','notaFact','notaCatFact','dcAging','dataMeta',
   'budgetStoreFact','budgetPBFact','budgetDailyFact','budgetProjectMonthly','sqvItems',
   'dcByItem','dcBySite','dcBySiteStatus','dcSites','uploadStatus','trafficFact','salperFact','tlMentor','budgetSalperFact','sourceKpi','kpiMatrix','beltingInternal','beltingPB','memberDb','memberTx'];
 const PERSIST_CHUNK_SIZE = 3.5 * 1024 * 1024; // chars per chunk, safely under the 5MB/key limit
@@ -1120,6 +1409,7 @@ async function tryLoadPersistedState(){
     const sd = STATE.dataMeta && STATE.dataMeta[mk] && STATE.dataMeta[mk][dk], pd = payload.dataMeta && payload.dataMeta[mk] && payload.dataMeta[mk][dk];
     if(sd && (!pd || sd > pd)){ keepSeed[mk] = {meta: STATE.dataMeta[mk], keys}; keys.forEach(k=>{ keepSeed[k] = STATE[k]; }); } });
   PERSIST_KEYS.forEach(k => { if(payload[k] === undefined) return; if(k==='memberDb' && (!payload[k] || !payload[k].length) && STATE.memberDb.length) return; STATE[k] = payload[k]; }); // database member bawaan tidak boleh tertimpa data kosong
+  try{ const sm = (SEED.itemMeta||{}); for(const k in sm){ const t = STATE.itemMeta[k]; if(t && t.pb===undefined && sm[k].pb) t.pb = sm[k].pb; } }catch(e){} // penanda Private/Exclusive Brand dari data bawaan
   Object.keys(keepSeed).forEach(k=>{ if(k==='sqv' || k==='dc' || k==='salper'){ STATE.dataMeta = STATE.dataMeta || {}; STATE.dataMeta[k] = keepSeed[k].meta; if(STATE.uploadStatus) STATE.uploadStatus[{sqv:'sqv', dc:'stockDC', salper:'salper'}[k]] = 'default'; } else STATE[k] = keepSeed[k]; });
   return true;
 }
@@ -1361,6 +1651,7 @@ function salesMeta(rows, files){
 // Recompute all sales-derived fact tables from a flat rows array, for a SET of (y,m) months.
 // Returns partial fact tables keyed by those months only.
 function computeFactsFromRows(rows){
+  const itemDayFact = new Map();
   const salesFact = new Map(), brandFact = new Map(), itemFact = new Map(),
         spFact = new Map(), sourceFact = new Map(), sourceDailyFact = new Map(), notaFact = new Map(), notaCatFact = new Map(), hourFact = new Map(), brandDayFact = new Map(), sourceZonaFact = new Map();
   const memberTx = [];
@@ -1387,7 +1678,10 @@ function computeFactsFromRows(rows){
     const k3 = key(r.y,r.m,r.item);
     if(!itemFact.has(k3)) itemFact.set(k3, {y:r.y,m:r.m,item:r.item,amt:0,qty:0});
     const s3 = itemFact.get(k3); s3.amt += r.amt; s3.qty += r.qty;
-    itemMeta[r.item] = {name:r.itemName, cat:r.cat, subcat:r.subcat, func:r.func, masterBrand:r.masterBrand, brand:r.brand};
+    const kd = key(r.y,r.m,r.d,r.item);
+    if(!itemDayFact.has(kd)) itemDayFact.set(kd, {y:r.y,m:r.m,d:r.d,item:r.item,amt:0,qty:0});
+    const sd = itemDayFact.get(kd); sd.amt += r.amt; sd.qty += r.qty;
+    itemMeta[r.item] = Object.assign({name:r.itemName, cat:r.cat, subcat:r.subcat, func:r.func, masterBrand:r.masterBrand, brand:r.brand}, r.isPB ? {pb:1} : {});
 
     // spFact: y,m,d,spId (Zona/Kriteria/Master Brand resolved later via salperFact lookup — a salesperson
     // keeps ONE fixed zona regardless of which product category they sold, unlike the old category-derived split)
@@ -1440,6 +1734,7 @@ function computeFactsFromRows(rows){
     salesFact: [...salesFact.values()],
     brandFact: [...brandFact.values()],
     itemFact: [...itemFact.values()],
+    itemDayFact: [...itemDayFact.values()],
     spFact: [...spFact.values()].map(({notas,...f})=>({...f, inv:notas.size, items:[...notas.values()].reduce((a,x)=>a+x.size,0)})),
     sourceFact: sourceFactArr,
     sourceDailyFact: sourceDailyFactArr,
@@ -1456,6 +1751,7 @@ function mergeSalesFacts(computed){
   STATE.salesFact = STATE.salesFact.filter(r=>!touched.has(ymKey(r))).concat(computed.salesFact);
   STATE.brandFact = STATE.brandFact.filter(r=>!touched.has(ymKey(r))).concat(computed.brandFact);
   STATE.itemFact = STATE.itemFact.filter(r=>!touched.has(ymKey(r))).concat(computed.itemFact);
+  STATE.itemDayFact = (STATE.itemDayFact||[]).filter(r=>!touched.has(ymKey(r))).concat(computed.itemDayFact);
   STATE.spFact = STATE.spFact.filter(r=>!touched.has(ymKey(r))).concat(computed.spFact);
   STATE.sourceFact = STATE.sourceFact.filter(r=>!touched.has(ymKey(r))).concat(computed.sourceFact);
   STATE.sourceDailyFact = (STATE.sourceDailyFact||[]).filter(r=>!touched.has(ymKey(r))).concat(computed.sourceDailyFact);
@@ -3349,7 +3645,7 @@ RENDERERS.upload = function(container){
     } catch(err){ log(err.message, true); }
   });
   document.getElementById('upclear-sales').addEventListener('click', ()=>{
-    STATE.salesFact=[]; STATE.brandFact=[]; STATE.itemFact=[]; STATE.itemMeta={}; STATE.spFact=[]; STATE.sourceFact=[]; STATE.sourceDailyFact=[]; STATE.hourFact=[]; STATE.brandDayFact=[]; STATE.sourceZonaFact=[]; STATE.notaFact=[]; STATE.notaCatFact=[]; STATE.memberTx=[];
+    STATE.salesFact=[]; STATE.brandFact=[]; STATE.itemFact=[]; STATE.itemDayFact=[]; STATE.itemMeta={}; STATE.spFact=[]; STATE.sourceFact=[]; STATE.sourceDailyFact=[]; STATE.hourFact=[]; STATE.brandDayFact=[]; STATE.sourceZonaFact=[]; STATE.notaFact=[]; STATE.notaCatFact=[]; STATE.memberTx=[];
     STATE.uploadStatus.sales='empty'; refreshStatus('sales'); log('Data sales dikosongkan.'); rendered_reset();
   });
 
