@@ -41,7 +41,9 @@ const newCred = (pw) => { const salt = randomBytes(16).toString('base64'); retur
 const checkPw = (pw, rec) => { try { const a = Buffer.from(hashPw(pw, rec.salt)), b = Buffer.from(rec.hash); return a.length === b.length && timingSafeEqual(a, b); } catch { return false; } };
 async function loadUsers() { try { const v = await store().get('users', { type: 'text' }); const o = v ? JSON.parse(v) : {}; return { users: o.users || {}, pending: o.pending || {} }; } catch { return { users: {}, pending: {} }; } }
 const saveUsers = (db) => store().set('users', JSON.stringify(db));
-const roleName = (r) => (r === 'admin' ? 'admin' : r === 'sales' ? 'sales' : 'viewer');
+const ID_RE = /^s\d{5}-\d{10}$/i; // format Salesperson ID, mis. S80000-0000000513
+// Akun yang user-nya Salesperson ID SELALU berperan Salesperson (hanya melihat data sendiri), kecuali sengaja dijadikan admin.
+const roleName = (r, u) => (r === 'admin' ? 'admin' : (r === 'sales' || (u && ID_RE.test(u))) ? 'sales' : 'viewer');
 const isOwner = (u) => u === OWNER_USER || (!!ADMIN_PASSWORD() && u === ADMIN_USER());
 const ownerPwOk = (u, pw) => {
   if (u === OWNER_USER) { try { const x = Buffer.from(hashPw(pw, OWNER_SALT)), y = Buffer.from(OWNER_HASH); if (x.length === y.length && timingSafeEqual(x, y)) return true; } catch {} }
@@ -57,7 +59,7 @@ async function who(req) {
   if (isOwner(o.u)) return { user: o.u, name: 'Admin', role: 'admin' };
   const db = await loadUsers(); const r = db.users[o.u];
   if (!r || r.disabled || (o.pv || 0) !== (r.pv || 0)) return null;
-  return { user: o.u, name: r.name || o.u, role: roleName(r.role), spId: r.spId || null };
+  return { user: o.u, name: r.name || o.u, role: roleName(r.role, o.u), spId: r.spId || o.u };
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -163,7 +165,7 @@ export default async (req) => {
         if (isOwner(u)) { if (ownerPwOk(u, pw)) return json({ ok: true, role: 'admin', name: 'Admin', token: sign({ u, exp: Date.now() + 12 * 3600e3 }) }); }
         else {
           const db = await loadUsers(); const r = db.users[u];
-          if (r && !r.disabled && checkPw(pw, r)) { const role = roleName(r.role); if (wantAdmin && role !== 'admin') { await sleep(600); return json({ ok: false, error: 'Akun ini bukan Admin. Pilih "Pengguna" untuk masuk.' }, 403); } return json({ ok: true, role, name: r.name || u, token: sign({ u, pv: r.pv || 0, exp: Date.now() + (role === 'admin' ? 12 * 3600e3 : 7 * 24 * 3600e3) }) }); }
+          if (r && !r.disabled && checkPw(pw, r)) { const role = roleName(r.role, u); if (wantAdmin && role !== 'admin') { await sleep(600); return json({ ok: false, error: 'Akun ini bukan Admin. Pilih "Pengguna" untuk masuk.' }, 403); } return json({ ok: true, role, name: r.name || u, token: sign({ u, pv: r.pv || 0, exp: Date.now() + (role === 'admin' ? 12 * 3600e3 : 7 * 24 * 3600e3) }) }); }
           if (r && r.disabled) { await sleep(600); return json({ ok: false, error: 'Akun dinonaktifkan. Hubungi admin.' }, 401); }
           if (db.pending[u] && checkPw(pw, db.pending[u])) return json({ ok: false, error: 'Permintaan akses Anda masih menunggu persetujuan admin.' }, 401);
         }
@@ -216,7 +218,7 @@ export default async (req) => {
     if (parts[0] === 'admin' && parts[1] === 'users') {
       if (me.user !== OWNER_USER) return json({ error: 'Kelola pengguna hanya untuk admin utama (' + OWNER_USER + ').' }, 403);
       const db = await loadUsers(); let target = ''; try { target = decodeURIComponent(parts[2] || '').toLowerCase(); } catch {}
-      const pub = () => ({ owner: OWNER_USER, users: Object.entries(db.users).map(([u, r]) => ({ username: u, name: r.name, role: r.role, spId: r.spId || null, mb: r.mb || null, disabled: !!r.disabled, created: r.created })), pending: Object.entries(db.pending).map(([u, r]) => ({ username: u, name: r.name, requestedAt: r.requestedAt })) });
+      const pub = () => ({ owner: OWNER_USER, users: Object.entries(db.users).map(([u, r]) => ({ username: u, name: r.name, role: roleName(r.role, u), spId: r.spId || (ID_RE.test(u) ? u : null), mb: r.mb || null, disabled: !!r.disabled, created: r.created })), pending: Object.entries(db.pending).map(([u, r]) => ({ username: u, name: r.name, requestedAt: r.requestedAt })) });
       if (method === 'GET' && !target) return json(pub());
       let b = {}; if (method !== 'GET' && method !== 'DELETE') { try { b = await req.json(); } catch {} }
       const roleOk = (r) => (r === 'admin' ? 'admin' : 'viewer');
@@ -252,14 +254,14 @@ export default async (req) => {
       if (!USERNAME_RE.test(target)) return json({ error: 'User tidak valid.' }, 400);
       if (method === 'POST' && parts[3] === 'approve') {
         const p = db.pending[target]; if (!p) return json({ error: 'Permintaan tidak ditemukan.' }, 404);
-        if (b.role === 'sales') { const info = (await salesMap()).get(target); if (!info) return json({ error: 'User ini bukan Salesperson ID yang terdaftar.' }, 400); db.users[target] = { name: cleanName(info.name) || p.name, role: 'sales', spId: info.id, mb: info.mb, salt: p.salt, hash: p.hash, pv: 1, created: new Date().toISOString() }; delete db.pending[target]; await saveUsers(db); return json(pub()); }
+        if (b.role === 'sales' || (ID_RE.test(target) && b.role !== 'admin')) { const info = (await salesMap()).get(target); if (!info) return json({ error: 'User ini bukan Salesperson ID yang terdaftar.' }, 400); db.users[target] = { name: cleanName(info.name) || p.name, role: 'sales', spId: info.id, mb: info.mb, salt: p.salt, hash: p.hash, pv: 1, created: new Date().toISOString() }; delete db.pending[target]; await saveUsers(db); return json(pub()); }
         db.users[target] = { name: p.name, role: roleOk(b.role), salt: p.salt, hash: p.hash, pv: 1, created: new Date().toISOString() }; delete db.pending[target];
         await saveUsers(db); return json(pub());
       }
       if (method === 'POST' && parts[3] === 'reject') { delete db.pending[target]; await saveUsers(db); return json(pub()); }
       if (method === 'POST' && parts[3] === 'update') {
         const r = db.users[target]; if (!r) return json({ error: 'User tidak ditemukan.' }, 404);
-        if (b.role !== undefined && r.role !== 'sales') r.role = roleOk(b.role);
+        if (b.role !== undefined && r.role !== 'sales' && !(ID_RE.test(target) && b.role !== 'admin')) r.role = roleOk(b.role);
         if (b.disabled !== undefined) r.disabled = !!b.disabled;
         if (b.name !== undefined) r.name = cleanName(b.name) || r.name;
         if (b.password) { if (String(b.password).length < 8) return json({ error: 'Password minimal 8 karakter.' }, 400); Object.assign(r, newCred(b.password)); }
