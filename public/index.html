@@ -150,18 +150,14 @@ h1,h2,h3,h4{
 body.fullwidth .sidebar{ display:none; } body.fullwidth .content{ padding:18px 18px 40px 18px; }
 /* Detail Sales Person: lebar muat di panel (tanpa geser kanan-kiri), scroll ke bawah tetap ada; kolom teks diringkas agar angka lega */
 .tbl-scroll.sp-fit{ max-height:72vh; overflow:auto; -webkit-overflow-scrolling:touch; }
-.sp-table{ table-layout:auto; width:max-content; min-width:100%; font-size:13px; border-collapse:separate; border-spacing:0; }
-.sp-table th, .sp-table td{ padding:10px 14px; white-space:nowrap; background:var(--panel,#fff); border-bottom:1px solid #EEEAE0; }
-.sp-table thead th{ white-space:nowrap; font-size:11.5px; line-height:1.25; vertical-align:bottom; position:sticky; top:0; z-index:2; background:var(--panel,#fff); }
-.sp-table th:nth-child(1), .sp-table td:nth-child(1){ min-width:150px; }
-.sp-table th:nth-child(2), .sp-table td:nth-child(2){ min-width:190px; }
-@media (min-width:900px){ /* di layar lebar, kolom ID & Nama tetap terlihat saat digeser ke kanan */
+.sp-table{ table-layout:auto; width:max-content; min-width:100%; font-size:12.5px; border-collapse:separate; border-spacing:0; }
+.sp-table th, .sp-table td{ padding:8px 0.5cm; white-space:nowrap; background:var(--panel,#fff); border-bottom:1px solid #EEEAE0; }
+.sp-table thead th{ white-space:nowrap; font-size:11px; line-height:1.25; vertical-align:bottom; position:sticky; top:0; z-index:2; background:var(--panel,#fff); }
+@media (min-width:900px){ /* kolom ID & Nama tetap terlihat saat digeser ke kanan */
   .sp-table th:nth-child(1), .sp-table td:nth-child(1){ position:sticky; left:0; z-index:1; }
-  .sp-table th:nth-child(2), .sp-table td:nth-child(2){ position:sticky; left:150px; z-index:1; box-shadow:2px 0 0 #E3DFD2; }
+  .sp-table th:nth-child(2), .sp-table td:nth-child(2){ position:sticky; left:var(--sp-c1, 170px); z-index:1; box-shadow:2px 0 0 #E3DFD2; }
   .sp-table thead th:nth-child(1), .sp-table thead th:nth-child(2){ z-index:3; }
 }
-.sp-table th:nth-child(3), .sp-table td:nth-child(3){ min-width:90px; } .sp-table th:nth-child(5), .sp-table td:nth-child(5){ min-width:130px; } .sp-table th:nth-child(6), .sp-table td:nth-child(6){ min-width:150px; }
-.sp-table th.num, .sp-table td.num{ min-width:92px; }
 .sp-table .heat-cell{ padding:2px 5px; }
 .sp-table thead th, .sp-table th.num{ text-align:center; }
 .sp-table td.num, .sp-table td:nth-child(1), .sp-table td:nth-child(3), .sp-table td:nth-child(4){ text-align:center; }
@@ -1735,6 +1731,7 @@ async function exportSpPdf(){
   }catch(e){ alert('Gagal membuat PDF: ' + (e && e.message || e)); }
   finally{ btn.disabled = false; btn.textContent = label; }
 }
+function shortWords(s, n=2){ const w = String(s==null?'':s).trim().split(/\s+/); return w.length>n ? w.slice(0,n).join(' ') : w.join(' '); } // nama/brand/TL panjang dipotong maksimal 2 kata (teks lengkap ada di tooltip)
 function spKey(k){ return k==='diffGrowth' ? (r=>r.amt-r.salesLY) : k; }
 function sortKeyFn(k){ if(!k) return null; if(k.startsWith('dc:')){ const site = k.slice(3); return r=>(r.dcByPlace||{})[site]||0; } if(k==='cls') return r=>invClsNorm(r.cls)||null; return k; }
 function toNum(s){
@@ -5400,10 +5397,10 @@ RENDERERS.salesperson = function(container){
       const spView = spSort.key ? sortRowsBy(filtered, spKey(spSort.key), spSort.dir) : filtered;
       document.getElementById('sp-tbody').innerHTML = spView.slice(0,400).map(r=>`
         <tr>
-          <td title="${r.spId}">${r.spId}</td><td title="${r.spName}">${r.spName}</td>
+          <td title="${r.spId}">${r.spId}</td><td title="${r.spName}">${shortWords(r.spName)}</td>
           <td><span class="zona-tag"><span class="zona-dot" style="background:${ZONA_COLOR[r.zona]||'#999'}"></span>${r.zona}</span></td>
           <td title="${r.kriteria||'-'}">${abbrKriteria(r.kriteria||'-')}</td>
-          <td title="${r.masterBrand||'-'}">${r.masterBrand||'-'}</td><td title="${r.tl||'-'}">${r.tl||'-'}</td>
+          <td title="${r.masterBrand||'-'}">${shortWords(r.masterBrand||'-')}</td><td title="${r.tl||'-'}">${shortWords(r.tl||'-')}</td>
           <td class="num">${r.rankStore<99999?'#'+r.rankStore:'-'}</td><td class="num">${r.rankZona<99999?'#'+r.rankZona:'-'}</td>
           <td class="num">${r.budget?fmtRp(r.budget,{noPrefix:true}):'-'}</td>
           <td class="num">${fmtRp(r.amt,{noPrefix:true})}</td>
@@ -5421,6 +5418,7 @@ RENDERERS.salesperson = function(container){
         </tr>`).join('');
     }
     renderTbl();
+    { const t1 = document.querySelector('.sp-table'); const fix = ()=>{ const c = t1 && t1.querySelector('th:nth-child(1)'); if(c) t1.style.setProperty('--sp-c1', c.getBoundingClientRect().width+'px'); }; fix(); setTimeout(fix,300); window.addEventListener('resize', fix); }
     attachSort(document.getElementById('sp-tbody').closest('table'), spSort, ()=>renderTbl(document.getElementById('sp-search').value));
     document.getElementById('sp-search').addEventListener('input', e=>renderTbl(e.target.value));
     document.getElementById('sp-pdf').addEventListener('click', ()=>exportSpPdf());
