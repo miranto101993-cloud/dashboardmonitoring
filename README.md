@@ -9,3 +9,6 @@ Diuji lokal (server Node + Blobs tiruan), belum di Netlify sungguhan.
 - Halaman Salesperson: Ranking, Actual, Budget, Achieve, Sales LY, Growth, Diff Budget, Diff Growth, Sales by Brand, Protection, Project, WhatsApp, Invoice, IPD, IPI, Basket Size; filter YTD / Semester / Kuartal / Bulan (+ Minggu) / Tanggal.
 - Master Brand dicocokkan lewat master brand tiap item; bulan terakhir diambil dari data yang benar-benar ada (termasuk hasil upload admin).
 - Setelah deploy, unggah ulang file penjualan terbaru (mis. Oktober) agar invoice Project/WhatsApp & Sales by Brand terisi untuk bulan yang diunggah sebelum pembaruan ini.
+
+## Kunci unggah (mencegah data tertimpa)
+Saat admin memilih file untuk diunggah, server memberi "kunci" ke admin itu (berlaku 8 menit, dilepas otomatis setelah tersimpan). Admin lain yang mencoba mengunggah/menyimpan pada saat itu mendapat pesan "sedang dikunci". Server juga menolak penyimpanan dari halaman yang datanya sudah lebih lama dari versi terbaru di server (muncul pesan "Data sudah diperbarui admin lain" → muat ulang, lalu unggah ulang file).

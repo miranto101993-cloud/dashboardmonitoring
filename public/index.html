@@ -149,13 +149,19 @@ h1,h2,h3,h4{
 .tbl-scroll.tbl-fit.tbl-dense table{ font-size:10.8px; } .tbl-scroll.tbl-fit.tbl-dense thead th{ font-size:9.8px; padding:7px 4px; } .tbl-scroll.tbl-fit.tbl-dense td{ padding:6px 4px; }
 body.fullwidth .sidebar{ display:none; } body.fullwidth .content{ padding:18px 18px 40px 18px; }
 /* Detail Sales Person: lebar muat di panel (tanpa geser kanan-kiri), scroll ke bawah tetap ada; kolom teks diringkas agar angka lega */
-.tbl-scroll.sp-fit{ max-height:72vh; overflow:auto; }
-.sp-table{ table-layout:fixed; width:100%; min-width:1040px; font-size:11.8px; }
-.sp-table th, .sp-table td{ padding:9px 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.sp-table thead th{ white-space:normal; font-size:10.4px; line-height:1.2; vertical-align:bottom; position:sticky; top:0; z-index:2; background:var(--panel,#fff); }
-.sp-table th:nth-child(1), .sp-table td:nth-child(1){ width:58px; } .sp-table th:nth-child(2), .sp-table td:nth-child(2){ width:112px; }
-.sp-table th:nth-child(3), .sp-table td:nth-child(3){ width:68px; } .sp-table th:nth-child(4), .sp-table td:nth-child(4){ width:64px; }
-.sp-table th:nth-child(5), .sp-table td:nth-child(5){ width:84px; } .sp-table th:nth-child(6), .sp-table td:nth-child(6){ width:96px; }
+.tbl-scroll.sp-fit{ max-height:72vh; overflow:auto; -webkit-overflow-scrolling:touch; }
+.sp-table{ table-layout:auto; width:max-content; min-width:100%; font-size:13px; border-collapse:separate; border-spacing:0; }
+.sp-table th, .sp-table td{ padding:10px 14px; white-space:nowrap; background:var(--panel,#fff); border-bottom:1px solid #EEEAE0; }
+.sp-table thead th{ white-space:nowrap; font-size:11.5px; line-height:1.25; vertical-align:bottom; position:sticky; top:0; z-index:2; background:var(--panel,#fff); }
+.sp-table th:nth-child(1), .sp-table td:nth-child(1){ min-width:150px; }
+.sp-table th:nth-child(2), .sp-table td:nth-child(2){ min-width:190px; }
+@media (min-width:900px){ /* di layar lebar, kolom ID & Nama tetap terlihat saat digeser ke kanan */
+  .sp-table th:nth-child(1), .sp-table td:nth-child(1){ position:sticky; left:0; z-index:1; }
+  .sp-table th:nth-child(2), .sp-table td:nth-child(2){ position:sticky; left:150px; z-index:1; box-shadow:2px 0 0 #E3DFD2; }
+  .sp-table thead th:nth-child(1), .sp-table thead th:nth-child(2){ z-index:3; }
+}
+.sp-table th:nth-child(3), .sp-table td:nth-child(3){ min-width:90px; } .sp-table th:nth-child(5), .sp-table td:nth-child(5){ min-width:130px; } .sp-table th:nth-child(6), .sp-table td:nth-child(6){ min-width:150px; }
+.sp-table th.num, .sp-table td.num{ min-width:92px; }
 .sp-table .heat-cell{ padding:2px 5px; }
 .sp-table thead th, .sp-table th.num{ text-align:center; }
 .sp-table td.num, .sp-table td:nth-child(1), .sp-table td:nth-child(3), .sp-table td:nth-child(4){ text-align:center; }
@@ -520,9 +526,9 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       return base;
     }
     /* ---------- agregasi ---------- */
-    function idxCur(rows, fields){ var o = {}; rows.forEach(function(r){ if(r.y !== cur || !r.d) return; var k = r.m * 100 + r.d, a = o[k] || (o[k] = {}); fields.forEach(function(f){ a[f] = (a[f] || 0) + num(r[f]); }); if(fields.indexOf('inv') >= 0 && num(r.inv) > 0) a.days = (a.days || 0) + 1; if(r.projInv === undefined) a.noPI = 1; }); return o; }
+    function idxCur(rows, fields){ var o = {}; rows.forEach(function(r){ if(r.y !== cur || !r.d) return; var k = r.m * 100 + r.d, a = o[k] || (o[k] = {}); fields.forEach(function(f){ a[f] = (a[f] || 0) + num(r[f]); }); if(fields.indexOf('inv') >= 0 && num(r.inv) > 0) a.days = (a.days || 0) + 1; if(r.projInv === undefined) a.noPI = 1; else a.hasPI = 1; }); return o; }
     function idxLy(rows, fields){ var o = {}; rows.forEach(function(r){ if(r.y !== ly) return; var a = o[r.m] || (o[r.m] = {}); fields.forEach(function(f){ a[f] = (a[f] || 0) + num(r[f]); }); }); return o; }
-    function sumCur(ix, P, fields){ var t = {}; fields.forEach(function(f){ t[f] = 0; }); t.days = 0; P.parts.forEach(function(p){ for(var d = p.d1; d <= p.d2; d++){ var a = ix[p.m * 100 + d]; if(a){ fields.forEach(function(f){ t[f] += a[f] || 0; }); t.days += a.days || 0; if(a.noPI) t.noPI = 1; } } }); return t; }
+    function sumCur(ix, P, fields){ var t = {}; fields.forEach(function(f){ t[f] = 0; }); t.days = 0; P.parts.forEach(function(p){ for(var d = p.d1; d <= p.d2; d++){ var a = ix[p.m * 100 + d]; if(a){ fields.forEach(function(f){ t[f] += a[f] || 0; }); t.days += a.days || 0; if(a.noPI) t.noPI = 1; if(a.hasPI) t.hasPI = 1; } } }); return t; }
     function lyW(p){ var n = dim(ly, p.m); return (p.d1 === 1 && p.d2 >= dim(cur, p.m)) ? 1 : (p.d2 - p.d1 + 1) / n; }
     function sumLy(il, P, fields){ var t = {}; fields.forEach(function(f){ t[f] = 0; }); P.parts.forEach(function(p){ var a = il[p.m]; if(a){ var w = lyW(p); fields.forEach(function(f){ t[f] += (a[f] || 0) * w; }); } }); return t; }
     function budgetOf(P, list){
@@ -538,13 +544,13 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
 
     /* ---------- ranking (nomor urut saja, dihitung server) ---------- */
     var RK = {};
-    function loadRank(P){
+    function loadRank(P){ /* store + zona */
       var key = P.s + '|' + P.e, el = function(){ return root.querySelector('#sx-rank'); };
       if(RK[key]){ paintRank(RK[key]); return; } if(!window.__rank || !P.parts.length) return;
       window.__rank(P.s, P.e).then(function(j){ RK[key] = j; if(key === curKey) paintRank(j); }).catch(function(){});
     }
     var curKey = '';
-    function paintRank(j){ var el = root.querySelector('#sx-rank'), e2 = root.querySelector('#sx-rank2'); if(!el) return; if(j && j.rank){ el.textContent = '#' + j.rank; if(e2) e2.textContent = 'dari ' + j.of + ' · ' + (j.group || ''); } else { el.textContent = '–'; if(e2) e2.textContent = 'belum ada penjualan pada periode ini'; } }
+    function paintRank(j){ var el = root.querySelector('#sx-rank'), e2 = root.querySelector('#sx-rank2'); if(!el) return; if(j && j.store){ el.innerHTML = '<span style="font-size:11.5px;color:'+SOFT+';font-weight:700;">STORE</span> #' + j.store + '<span style="font-size:12px;color:'+SOFT+';font-weight:600;"> / ' + j.storeOf + '</span><br><span style="font-size:11.5px;color:'+SOFT+';font-weight:700;">' + esc((j.zonaName || 'ZONA').toUpperCase()) + '</span> #' + j.zona + '<span style="font-size:12px;color:'+SOFT+';font-weight:600;"> / ' + j.zonaOf + '</span>'; if(e2) e2.textContent = 'rank Actual periode ini'; } else { el.textContent = '–'; if(e2) e2.textContent = 'belum ada penjualan pada periode ini'; } }
 
     /* ---------- trend ---------- */
     function trendPanels(P, getC, getL, title, opt){
@@ -575,12 +581,12 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
     function meHtml(){
       var P = period(); if(!P.parts.length) return '<div class="sx-panel"><div class="sx-empty">Belum ada data pada periode ini.</div></div>';
       var c = sumCur(spC, P, SPF), l = sumLy(spL, P, ['amt','pbAmt','brandAmt','projectAmt','whatsappAmt','protectionQty']), bud = budgetOf(P);
-      var amt = c.amt, lyA = l.amt, hasInv = !c.noPI, approx = S.per === 'date' || (S.per === 'month' && S.week);
-      var ach = bud ? amt / bud * 100 : null, g = growth(amt, lyA), brandV = isPB ? c.pbAmt : c.brandAmt, brandL = isPB ? l.pbAmt : l.brandAmt;
+      var amt = c.amt, lyA = l.amt, hasInv = !!c.hasPI, partInv = !!(c.hasPI && c.noPI), approx = S.per === 'date' || (S.per === 'month' && S.week);
+      var ach = bud ? amt / bud * 100 : null, g = growth(amt, lyA), pool = sumCur(itC, P, ['amt']).amt, poolL = sumLy(itL, P, ['amt']).amt, own = isPB ? c.pbAmt : c.brandAmt;
       var brandLbl = isPB ? 'Private Brand' : (U.mb || 'Brand');
       var inv = c.inv, ipd = c.days ? inv / c.days : null, ipi = inv ? c.items / inv : null, basket = inv ? amt / inv : null;
       var h = '<div class="sx-cards">'
-        + card('Ranking', '<span id="sx-rank">…</span>', '<span id="sx-rank2">berdasarkan sales value</span>')
+        + card('Ranking Store &amp; Zona', '<span id="sx-rank">…</span>', '<span id="sx-rank2">berdasarkan sales value</span>')
         + card('Actual Sales', fRp(amt), periodLabel(P))
         + card('Budget', bud == null ? '–' : fRp(bud), bud == null ? 'Budget tidak tersedia untuk zona ini' : 'Budget Salesperson ' + esc(U.zona || ''))
         + card('Achieve', ach == null ? '–' : '<span style="color:' + (ach >= 100 ? GOOD : BAD) + '">' + pct(ach) + '</span>', 'Actual ÷ Budget')
@@ -588,7 +594,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         + card('Growth', lyA ? gHtml(g) : '–', 'vs ' + ly)
         + card('Diff Budget', bud == null ? '–' : dClr(amt - bud, fD(amt - bud)), 'Actual − Budget')
         + card('Diff Growth', lyA ? dClr(amt - lyA, fD(amt - lyA)) : '–', 'Actual − Sales LY')
-        + (hasBrand ? card('Sales by Brand', fRp(brandV), esc(brandLbl) + (amt ? ' · ' + pct(brandV / amt * 100) + ' dari sales' : '') + (brandL ? '<br>LY: ' + fRp(brandL) + ' ' + gHtml(growth(brandV, brandL)) : '')) : '')
+        + (hasBrand ? card('Sales by Brand', fRp(pool), esc(brandLbl) + ' · seluruh toko' + (poolL ? '<br>LY: ' + fRp(poolL) + ' ' + gHtml(growth(pool, poolL)) : '') + '<br>Penjualan Anda: <b>' + fRp(own) + '</b>') : '')
         + card('Sales Protection', fRp(c.protectionAmt), 'Qty: <b>' + fN(c.protectionQty) + '</b>' + (l.protectionQty ? ' · LY qty ' + fN(l.protectionQty) : ''))
         + card('Sales Project', fRp(c.projectAmt), 'Invoice: <b>' + (hasInv ? fN(c.projInv) : '–') + '</b>' + (l.projectAmt ? '<br>LY: ' + fRp(l.projectAmt) : ''))
         + card('Sales WhatsApp', fRp(c.whatsappAmt), 'Invoice: <b>' + (hasInv ? fN(c.waInv) : '–') + '</b>' + (l.whatsappAmt ? '<br>LY: ' + fRp(l.whatsappAmt) : ''))
@@ -597,16 +603,21 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         + card('IPI', ipi == null ? '–' : ipi.toLocaleString('id-ID', {maximumFractionDigits:2}), 'Item per invoice')
         + card('Basket Size', basket == null ? '–' : fRp(basket), 'Sales ÷ invoice')
         + '</div>';
-      if(!hasInv) h += '<div class="sx-note">Sebagian data belum memuat rincian invoice Project/WhatsApp — minta admin mengunggah ulang file penjualan bulan terkait.</div>';
+      if(!hasInv) h += '<div class="sx-note">Rincian invoice Project/WhatsApp belum ada pada data periode ini — minta admin mengunggah ulang file penjualan bulan terkait.</div>'; else if(partInv) h += '<div class="sx-note">Invoice Project/WhatsApp belum termasuk bulan yang diunggah sebelum pembaruan (angka terisi setelah file bulan itu diunggah ulang).</div>';
       if(approx) h += '<div class="sx-note">Sales LY dihitung proporsional jumlah hari dari data bulanan ' + ly + ' (data LY tidak tersedia per tanggal).</div>';
       // trend
       var getC = function(Pm){ return sumCur(spC, Pm, ['amt']).amt; }, getL = function(Pm){ return sumLy(spL, Pm, ['amt']).amt; };
       h += trendPanels(P, getC, getL, 'Sales');
       // tabel rincian
       if(S.per === 'ytd' || S.per === 'sem' || S.per === 'q'){
-        var rows = P.parts.map(function(p){ var Pm = {parts:[p]}, cc = sumCur(spC, Pm, SPF), ll = sumLy(spL, Pm, ['amt']), bb = budgetOf(Pm); return '<tr><td>' + MN[p.m-1] + '</td><td>' + fRp(cc.amt) + '</td><td>' + (bb == null ? '–' : fRp(bb)) + '</td><td>' + (bb ? pct(cc.amt / bb * 100) : '–') + '</td><td>' + fRp(ll.amt) + '</td><td>' + gHtml(growth(cc.amt, ll.amt)) + '</td><td>' + fN(cc.inv) + '</td></tr>'; }).join('');
-        h += '<div class="sx-panel"><div class="sx-ph">Rincian per Bulan</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Bulan</th><th>Actual</th><th>Budget</th><th>Achieve</th><th>' + ly + '</th><th>Growth</th><th>Invoice</th></tr></thead><tbody>' + rows
-          + '<tr class="tot"><td>Total</td><td>' + fRp(amt) + '</td><td>' + (bud == null ? '–' : fRp(bud)) + '</td><td>' + (ach == null ? '–' : pct(ach)) + '</td><td>' + fRp(lyA) + '</td><td>' + gHtml(g) + '</td><td>' + fN(inv) + '</td></tr></tbody></table></div></div>';
+        var bl = function(Pm, cc){ return hasBrand ? sumCur(itC, Pm, ['amt']).amt : 0; };
+        var row = function(lab, Pm, bold){ var cc = sumCur(spC, Pm, SPF), ll = sumLy(spL, Pm, ['amt']), bb = budgetOf(Pm), pi = cc.hasPI, ip = cc.days ? cc.inv / cc.days : null, ipx = cc.inv ? cc.items / cc.inv : null;
+          return '<tr' + (bold ? ' class="tot"' : '') + '><td>' + lab + '</td><td>' + fRp(cc.amt) + '</td><td>' + (bb == null ? '–' : fRp(bb)) + '</td><td>' + (bb ? pct(cc.amt / bb * 100) : '–') + '</td><td>' + fRp(ll.amt) + '</td><td>' + gHtml(growth(cc.amt, ll.amt)) + '</td><td>' + fN(cc.inv) + '</td>'
+            + '<td>' + (hasBrand ? fRp(bl(Pm)) : '–') + '</td><td>' + fRp(cc.protectionAmt) + '<small>qty ' + fN(cc.protectionQty) + '</small></td><td>' + fRp(cc.projectAmt) + '<small>inv ' + (pi ? fN(cc.projInv) : '–') + '</small></td><td>' + fRp(cc.whatsappAmt) + '<small>inv ' + (pi ? fN(cc.waInv) : '–') + '</small></td>'
+            + '<td>' + (ip == null ? '–' : ip.toLocaleString('id-ID', {maximumFractionDigits:1})) + '</td><td>' + (ipx == null ? '–' : ipx.toLocaleString('id-ID', {maximumFractionDigits:2})) + '</td><td>' + (cc.inv ? fRp(cc.amt / cc.inv) : '–') + '</td></tr>'; };
+        var rows = P.parts.map(function(p){ return row(MN[p.m-1], {parts:[p]}, false); }).join('');
+        h += '<div class="sx-panel"><div class="sx-ph">Rincian per Bulan</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Bulan</th><th>Actual</th><th>Budget</th><th>Achieve</th><th>' + ly + '</th><th>Growth</th><th>Invoice</th><th>Sales by Brand</th><th>Protection</th><th>Project</th><th>WhatsApp</th><th>IPD</th><th>IPI</th><th>Basket</th></tr></thead><tbody>' + rows + row('Total', P, true) + '</tbody></table></div>'
+          + '<div class="sx-note">Sales by Brand = penjualan ' + (hasBrand ? (isPB ? 'Private + Exclusive Brand zona Anda' : 'master brand ' + esc(U.mb || '')) + ' di seluruh toko' : '–') + '. Budget = Budget Salesperson zona.</div></div>';
       } else {
         var m0 = P.parts[0].m, a = S.per === 'month' && S.week ? P.parts[0] : {d1:1, d2:maxDayOf(m0)}, trs = '';
         for(var d = a.d1; d <= a.d2; d++){ var cc = sumCur(spC, {parts:[{m:m0, d1:d, d2:d}]}, SPF); if(!cc.amt && !cc.inv) continue; trs = '<tr' + (S.per === 'date' && d === +S.date.slice(8, 10) ? ' class="tot"' : '') + '><td>' + d + ' ' + MS[m0-1] + '</td><td>' + fRp(cc.amt) + '</td><td>' + fN(cc.inv) + '</td><td>' + (cc.inv ? fRp(cc.amt / cc.inv) : '–') + '</td><td>' + fRp(isPB ? cc.pbAmt : cc.brandAmt) + '</td></tr>' + trs; }
@@ -625,17 +636,32 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
     function itemRows(P){
       var ag = itemAgg(P), ids = {}; Object.keys(D.itemMeta).forEach(function(k){ ids[k] = 1; });
       return Object.keys(ids).map(function(id){ var m = D.itemMeta[id] || {}, a = ag.A[id] || {amt:0, qty:0}, b = ag.B[id] || {amt:0, qty:0};
-        return {id:id, name:m.name || id, cat:m.cat || '(lainnya)', sub:m.subcat || '', brand:m.brand || '(lainnya)', cls:m.cls || '', amt:a.amt, qty:a.qty, lyAmt:b.amt, lyQty:b.qty, sv:num(m.sv), sq:num(m.sq), dc:num(m.dc), g:growth(a.amt, b.amt), dg:a.amt - b.amt}; });
+        return {id:id, name:m.name || id, cat:m.cat || '(lainnya)', catmb:titleCase(m.cat || '(lainnya)') + ' / ' + titleCase(m.mb || U.mb || '-'), sub:m.subcat || '', brand:m.brand || '(lainnya)', cls:m.cls || '', amt:a.amt, qty:a.qty, lyAmt:b.amt, lyQty:b.qty, sv:num(m.sv), sq:num(m.sq), dc:num(m.dc), g:growth(a.amt, b.amt), dg:a.amt - b.amt}; });
     }
     function tri(v, q){ return fRp(v) + '<small>qty ' + fN(q) + (q ? ' · avg ' + fRp(v / q) : '') + '</small>'; }
+    // Budget Master Brand = rata-rata sales bulanan tahun lalu (LY); bila belum ada sales LY → rata-rata sales bulanan tahun berjalan yang ada
+    function brandBudget(P){
+      var lyM = {}, curM = {}; (D.itemFact || []).forEach(function(r){ if(r.y === ly) lyM[r.m] = (lyM[r.m] || 0) + num(r.amt); });
+      (D.itemDayFact || []).forEach(function(r){ if(r.y === cur) curM[r.m] = (curM[r.m] || 0) + num(r.amt); });
+      var avg = function(o, skipM){ var s = 0, n = 0; Object.keys(o).forEach(function(k){ if(o[k] > 0 && +k !== skipM){ s += o[k]; n++; } }); return n ? s / n : 0; };
+      var a = avg(lyM), note;
+      if(a > 0) note = 'Rata-rata sales bulanan ' + ly + ': ' + fRp(a);
+      else { a = avg(curM, lm); if(!a) a = avg(curM); note = a ? 'Rata-rata sales bulanan ' + cur + ' yang ada: ' + fRp(a) : ''; }
+      if(!(a > 0)) return {v:null, note:''};
+      var t = 0; P.parts.forEach(function(p){ var arr = D.budgetDay && D.budgetDay[p.m], share, n = dim(cur, p.m);
+        if(arr && arr.length){ var tot = 0, part = 0; for(var d = 1; d <= n; d++){ var v = arr[d-1] || 0; tot += v; if(d >= p.d1 && d <= p.d2) part += v; } share = tot > 0 ? part / tot : (p.d2 - p.d1 + 1) / n; } else share = (p.d2 - p.d1 + 1) / n;
+        t += a * share; });
+      return {v:t, note:note};
+    }
+    function titleCase(s){ return String(s || '').toLowerCase().replace(/(^|[\s\/&(,.-])([a-z])/g, function(m, p, c){ return p + c.toUpperCase(); }); }
     function brandHtml(){
       if(!hasBrand) return '<div class="sx-panel"><div class="sx-empty">Master brand <b>' + esc(U.mb || '-') + '</b> tidak memiliki data penjualan item di dashboard, sehingga hanya data Sales Anda yang tersedia.</div></div>';
       var P = period(); if(!P.parts.length) return '<div class="sx-panel"><div class="sx-empty">Belum ada data pada periode ini.</div></div>';
       var rows = itemRows(P), tot = {amt:0, qty:0, lyAmt:0, lyQty:0, sv:0, sq:0, dc:0}; rows.forEach(function(r){ for(var k in tot) tot[k] += r[k]; });
-      var bud = budgetOf(P, isPB ? (D.brandBudget || []) : null), ach = bud ? tot.amt / bud * 100 : null, approx = S.per === 'date' || (S.per === 'month' && S.week);
+      var bb0 = brandBudget(P), bud = bb0.v, ach = bud ? tot.amt / bud * 100 : null, approx = S.per === 'date' || (S.per === 'month' && S.week);
       var title = isPB ? 'Private + Exclusive Brand ' + (U.zona || '') : (U.mb || '');
       var h = '<div class="sx-note" style="margin:0 0 8px;">' + (isPB ? 'Penjualan <b>Private Brand + Exclusive Brand</b> (Master Type Brand) pada <b>' + esc(U.zona || '-') + '</b> di seluruh toko.' : 'Penjualan master brand <b>' + esc(title) + '</b> di seluruh toko (bukan hanya penjualan Anda).') + ' · ' + esc(periodLabel(P)) + '</div><div class="sx-cards">'
-        + card('Budget', bud == null ? '–' : fRp(bud), bud == null ? 'Budget tidak tersedia' : (isPB ? 'Budget Private Brand ' : 'Budget Salesperson ') + esc(U.zona || ''))
+        + card('Budget', bud == null ? '–' : fRp(bud), bud == null ? 'Budget tidak tersedia (belum ada data sales)' : esc(bb0.note))
         + card('Actual', fRp(tot.amt), 'Qty: <b>' + fN(tot.qty) + '</b><br>Rata-rata/item: <b>' + (tot.qty ? fRp(tot.amt / tot.qty) : '–') + '</b>')
         + card('Sales LY', fRp(tot.lyAmt), 'Qty: <b>' + fN(tot.lyQty) + '</b><br>Rata-rata/item: <b>' + (tot.lyQty ? fRp(tot.lyAmt / tot.lyQty) : '–') + '</b>')
         + card('Achieve', ach == null ? '–' : '<span style="color:' + (ach >= 100 ? GOOD : BAD) + '">' + pct(ach) + '</span>', 'Actual ÷ Budget')
@@ -652,12 +678,12 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         var g = {}; rows.forEach(function(r){ var k = r[key]; var o = g[k] || (g[k] = {k:k, amt:0, qty:0, lyAmt:0, lyQty:0, sv:0, sq:0, dc:0}); for(var f in tot) o[f] += r[f]; });
         var list = Object.keys(g).map(function(k){ return g[k]; }).filter(function(o){ return o.amt || o.lyAmt || o.sv; }).sort(function(a, b){ return b.amt - a.amt; });
         var shown = list.slice(0, limit);
-        return '<div class="sx-panel"><div class="sx-ph">Sales per ' + label + ' <small>' + list.length + ' ' + label.toLowerCase() + (list.length > limit ? ' · tampil ' + limit + ' teratas' : '') + '</small></div><div class="sx-tw"><table class="sx-t"><thead><tr><th>' + label + '</th><th>Actual</th><th>Sales LY</th><th>Growth</th><th>Diff Growth</th><th>Inventory</th></tr></thead><tbody>'
+        return '<div class="sx-panel"><div class="sx-ph">Sales per ' + label + ' <small>' + list.length + ' baris' + (list.length > limit ? ' · tampil ' + limit + ' teratas' : '') + '</small></div><div class="sx-tw"><table class="sx-t"><thead><tr><th>' + label + '</th><th>Actual</th><th>Sales LY</th><th>Growth</th><th>Diff Growth</th><th>Inventory</th></tr></thead><tbody>'
           + shown.map(function(o){ return '<tr><td><b>' + esc(o.k) + '</b></td><td>' + tri(o.amt, o.qty) + '</td><td>' + (approx ? '≈ ' : '') + tri(o.lyAmt, o.lyQty) + '</td><td>' + (o.lyAmt ? gHtml(growth(o.amt, o.lyAmt)) : '–') + '</td><td>' + dClr(o.amt - o.lyAmt, fD(o.amt - o.lyAmt)) + '</td><td>' + fRp(o.sv) + '<small>qty ' + fN(o.sq) + ' · DC ' + fN(o.dc) + '</small></td></tr>'; }).join('')
           + '<tr class="tot"><td>Total</td><td>' + tri(tot.amt, tot.qty) + '</td><td>' + tri(tot.lyAmt, tot.lyQty) + '</td><td>' + (tot.lyAmt ? gHtml(growth(tot.amt, tot.lyAmt)) : '–') + '</td><td>' + dClr(tot.amt - tot.lyAmt, fD(tot.amt - tot.lyAmt)) + '</td><td>' + fRp(tot.sv) + '<small>qty ' + fN(tot.sq) + ' · DC ' + fN(tot.dc) + '</small></td></tr></tbody></table></div>'
-          + (key === 'cat' ? '<div class="sx-note">Budget hanya tersedia di level Salesperson / Master Brand (lihat kartu di atas), tidak per kategori maupun brand.</div>' : '') + '</div>';
+          + (key === 'catmb' ? '<div class="sx-note">Budget hanya dihitung di level Master Brand (kartu di atas), tidak per kategori maupun brand.</div>' : '') + '</div>';
       }
-      return h + grpTable('cat', 'Kategori', 30) + grpTable('brand', 'Brand', 30);
+      return h + grpTable('catmb', 'Category / Master Brand', 60) + grpTable('brand', 'Brand', 30);
     }
 
     /* ---------- tab: Item Detail ---------- */
@@ -715,7 +741,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         + '<div class="sx-chips">' + (U.zona ? '<span class="sx-chip">Zona: <b>' + esc(U.zona) + '</b></span>' : '') + '<span class="sx-chip">Master Brand: <b>' + esc(U.mb || '-') + '</b></span>' + (U.tl ? '<span class="sx-chip">TL: <b>' + esc(U.tl) + '</b></span>' : '') + '<span class="sx-chip">Data s/d <b>' + esc(fDate(latestD)) + '</b></span></div></div></div>'
         + '<div class="sx-bar"><div class="sx-wrap" style="padding:0;">' + controls(P) + '</div></div>'
         + '<div class="sx-wrap"><div class="sx-tabs"><button data-tab="me" class="' + (S.tab === 'me' ? 'on' : '') + '">Sales Saya</button><button data-tab="brand" class="' + (S.tab === 'brand' ? 'on' : '') + '">Master Brand</button>' + (hasBrand ? '<button data-tab="item" class="' + (S.tab === 'item' ? 'on' : '') + '">Item Detail</button>' : '') + '</div>'
-        + body + '<div class="sx-note" style="text-align:center;margin-top:18px;">Anda hanya dapat melihat data Sales Anda dan master brand Anda.</div></div>';
+        + body + '<div class="sx-note" style="text-align:center;margin-top:18px;">Anda hanya dapat melihat data Sales Anda dan master brand Anda.<br><i>Create by Miranto</i></div></div>';
       root.querySelector('#sx-out').onclick = onLogout;
       root.querySelectorAll('[data-per]').forEach(function(b){ b.onclick = function(){ S.per = b.dataset.per; S.week = 0; S.limit = 50; draw(); }; });
       root.querySelectorAll('[data-wk]').forEach(function(b){ b.onclick = function(){ S.week = +b.dataset.wk; draw(); }; });
@@ -756,7 +782,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       var mode = 'login', who = 'user', kind = 'sales';
       function draw(msg, ok){
         d.innerHTML = '<form style="background:#fff;border-radius:14px;padding:26px 24px;width:100%;max-width:370px;box-shadow:0 20px 60px rgba(0,0,0,.4);">'
-          + '<div style="font-weight:800;font-size:17px;color:#17262E;">PERFORMANCE DASHBOARD</div><div style="font-size:12.5px;color:#6b6f6a;margin:2px 0 6px;">Mitra10 Yogyakarta</div>'
+          + '<div style="font-weight:800;font-size:17px;color:#17262E;">PERFORMANCE DASHBOARD</div><div style="font-size:12.5px;color:#6b6f6a;margin:2px 0 0;">Mitra10 Yogyakarta</div><div style="font-size:11.5px;color:#7E8C84;font-style:italic;margin:0 0 6px;">Create by Miranto</div>'
           + (mode === 'login' ? '<div style="display:flex;gap:6px;margin:12px 0 2px;"><button type="button" data-who="user" style="flex:1;padding:9px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;cursor:pointer;background:' + (who==='user' ? '#17262E;color:#fff' : '#fff;color:#444') + ';">Pengguna</button><button type="button" data-who="admin" style="flex:1;padding:9px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;cursor:pointer;background:' + (who==='admin' ? '#D9720B;color:#241500' : '#fff;color:#444') + ';">Admin</button></div>' : '')
           + (mode === 'req' ? '<label style="'+LB+'">Kriteria akses</label><div style="display:flex;gap:6px;margin-top:6px;">' + [['manager','Manager'],['tl','Team Leader'],['sales','Sales']].map(function(k){ return '<button type="button" data-kind="' + k[0] + '" style="flex:1;padding:10px 4px;border-radius:9px;border:1px solid #cfcabb;font-weight:700;font-size:13px;cursor:pointer;background:' + (kind === k[0] ? '#17262E;color:#fff' : '#fff;color:#444') + ';">' + k[1] + '</button>'; }).join('') + '</div><div style="font-size:11.5px;color:#6b6f6a;margin-top:6px;line-height:1.45;">' + (kind === 'manager' ? 'Semua menu termasuk Upload Data &amp; Data Customer (kecuali Kelola Pengguna).' : kind === 'tl' ? 'Semua menu kecuali Data Customer &amp; Upload Data (admin dapat menaikkan ke Admin).' : 'Hanya data penjualan Anda sendiri, master brand &amp; item master brand Anda.') + ' Perlu persetujuan admin utama.</div>' : '')
           + (mode === 'req' ? '<label style="'+LB+'">' + (kind === 'sales' ? 'Nama <span style="font-weight:500;color:#777;">(cukup salah satu kata dari nama Anda di database Salesperson)</span>' : 'Nama lengkap') + '</label><input id="site-name" autocomplete="name" placeholder="' + (kind === 'sales' ? 'mis. Satriyo' : 'mis. Hasbi Ahmad Wahyudi') + '" style="'+IN+'">' : '')
@@ -805,7 +831,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       if(isMeta){
         var info = JSON.parse(value); info.sid = SID || info.sid; var prev = LAST_META; value = JSON.stringify(info);
         body = await gz(value);
-        var r = await api('store/' + encodeURIComponent(k), {method:'PUT', body: body}); if(!r.ok) throw new Error('Gagal menyimpan ke server (HTTP ' + r.status + ')');
+        var r = await api('store/' + encodeURIComponent(k), {method:'PUT', body: body, headers:{'x-base-rev': window.__REV}}); if(!r.ok){ var ej = await r.json().catch(function(){ return {}; }); if(ej.stale || ej.locked) blockModal(ej.error, !!ej.stale); throw new Error(ej.error || ('Gagal menyimpan ke server (HTTP ' + r.status + ')')); }
         var j = await r.json(); if(j.rev) window.__REV = j.rev;
         LAST_META = info; META_VER = info.savedAt || '';
         if(prev && prev.sid && prev.sid !== info.sid){ for(var i=0;i<(prev.n||0);i++) api('store/' + encodeURIComponent('v' + prev.sid + ':chunk:' + i), {method:'DELETE'}).catch(function(){}); } // bersihkan versi lama
@@ -814,7 +840,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       var ci = chunkKey(key);
       if(ci !== null){ if(!SID) SID = Date.now().toString(36) + Math.random().toString(36).slice(2, 5); k = 'v' + SID + ':chunk:' + ci; }
       body = await gz(value);
-      var r2 = await api('store/' + encodeURIComponent(k), {method:'PUT', body: body}); if(!r2.ok) throw new Error('Gagal menyimpan ke server (HTTP ' + r2.status + ')');
+      var r2 = await api('store/' + encodeURIComponent(k), {method:'PUT', body: body}); if(!r2.ok){ var e2 = await r2.json().catch(function(){ return {}; }); if(e2.locked) blockModal(e2.error, false); throw new Error(e2.error || ('Gagal menyimpan ke server (HTTP ' + r2.status + ')')); }
       return {key: key, value: value};
     },
     async delete(key){
@@ -824,6 +850,32 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
     },
     async list(){ return {keys: []}; }
   };
+
+  // ---------- kunci unggah & perlindungan data terbaru ----------
+  function blockModal(msg, stale){
+    var old = document.getElementById('site-block'); if(old) return;
+    var d = document.createElement('div'); d.id = 'site-block'; d.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(15,25,30,.72);display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,-apple-system,sans-serif;';
+    d.innerHTML = '<div style="background:#fff;border-radius:14px;padding:22px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4);"><div style="font-weight:800;font-size:16px;color:#B23A2E;">' + (stale ? 'Data sudah diperbarui admin lain' : 'Penyimpanan data dikunci') + '</div><div style="font-size:14px;line-height:1.55;margin:10px 0 16px;color:#222;">' + (msg || '') + '</div><div style="display:flex;gap:8px;justify-content:flex-end;"><button id="sb-close" style="border:1px solid #cfcabb;background:#fff;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer;">Tutup</button><button id="sb-reload" style="border:0;background:#D9720B;color:#241500;border-radius:9px;padding:10px 14px;font-weight:800;cursor:pointer;">Muat ulang</button></div></div>';
+    document.body.appendChild(d); d.querySelector('#sb-close').onclick = function(){ d.remove(); }; d.querySelector('#sb-reload').onclick = function(){ location.reload(); };
+  }
+  window.__uploadBegin = async function(){
+    if(ROLE !== 'admin') return;
+    var r = await api('lock', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({action:'acquire', rev: window.__REV})}), j = await r.json().catch(function(){ return {}; });
+    if(!r.ok || !j.ok){ blockModal(j.error || 'Tidak bisa mengambil kunci unggah.', !!j.stale); throw new Error(j.error || 'LOCK'); }
+  };
+  window.__uploadEnd = function(){ if(ROLE === 'admin') api('lock', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({action:'release'})}).catch(function(){}); };
+  // Gerbang saat admin memilih / menjatuhkan file: ambil kunci + pastikan halaman memuat data terbaru SEBELUM file diproses
+  function gate(ev){
+    if(ROLE !== 'admin') return;
+    var isFile = ev.type === 'drop' ? !!(ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files.length) : (ev.target && ev.target.type === 'file'); if(!isFile) return;
+    try{
+      var x = new XMLHttpRequest(); x.open('POST', '/api/lock', false); x.setRequestHeader('Authorization', 'Bearer ' + tok()); x.setRequestHeader('content-type', 'application/json'); x.send(JSON.stringify({action:'acquire', rev: window.__REV}));
+      if(x.status === 200) return; var j = {}; try{ j = JSON.parse(x.responseText); }catch(e){}
+      ev.stopImmediatePropagation(); ev.preventDefault(); if(ev.target && ev.target.type === 'file') ev.target.value = '';
+      blockModal(j.error || 'Tidak bisa mengambil kunci unggah.', !!j.stale);
+    }catch(e){}
+  }
+  document.addEventListener('change', gate, true); document.addEventListener('drop', gate, true);
 
   // ---------- pemuatan data bawaan (setelah login) ----------
   window.__loadSiteData = async function(){
@@ -864,7 +916,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
     d.style.cssText = 'position:fixed;inset:0;z-index:99995;background:rgba(10,18,22,.6);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;font-family:system-ui,-apple-system,sans-serif;';
     document.body.appendChild(d);
     var BT = 'border:0;border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;margin:2px 2px 2px 0;';
-    var msg = '', SM = null, LASTRES = null, SMAP = {};
+    var msg = '', QS = '', SM = null, LASTRES = null, SMAP = {};
     async function call(path, method, body){
       var r = await api('admin/users' + path, {method: method, headers: {'content-type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
       var j = await r.json().catch(function(){ return {}; }); if(!r.ok){ msg = j.error || ('Gagal (HTTP ' + r.status + ')'); return null; } msg = ''; return j;
@@ -877,14 +929,15 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><div style="font-weight:800;font-size:17px;color:#17262E;">Kelola Pengguna</div><button id="uc" style="'+BT+'background:#eee;">Tutup ✕</button></div>'
         + '<div style="font-size:12px;color:#6b6f6a;margin:4px 0 10px;">Admin utama: <b>' + esc(data.owner) + '</b> (dari pengaturan Netlify, tidak bisa dihapus). Menghapus / menonaktifkan user langsung memutus aksesnya.</div>'
         + (msg ? '<div style="color:#B23A2E;font-size:13px;margin-bottom:8px;">' + esc(msg) + '</div>' : '');
+      h += '<input id="usearch" type="search" placeholder="🔍 Cari user / nama / peran…" value="' + esc(QS) + '" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cfcabb;border-radius:9px;font-size:16px;margin:2px 0 6px;"><div id="uempty" style="display:none;font-size:13px;color:#777;margin:4px 0;">Tidak ada user yang cocok.</div>';
       h += '<div style="font-weight:700;margin:10px 0 4px;">Permintaan akses (' + data.pending.length + ')</div>';
       if(!data.pending.length) h += '<div style="font-size:13px;color:#777;">Tidak ada permintaan.</div>';
       data.pending.forEach(function(p){ var kd = p.kind || 'tl', kl = kd === 'manager' ? 'Manager' : kd === 'sales' ? 'Sales' : 'Team Leader', U = esc(p.username), B = function(r, t, bg, fg){ return '<button data-a="approve" data-r="' + r + '" data-u="' + U + '" style="'+BT+'background:' + bg + ';color:' + fg + ';">' + t + '</button>'; };
         var btns = kd === 'sales' ? (SMAP[p.username] ? B('sales', 'Setujui Salesperson (' + esc(SMAP[p.username].mb) + ')', '#1B7F4B', '#fff') : '<span style="font-size:12px;color:#B23A2E;">ID tidak ada di database</span>') : kd === 'manager' ? B('admin', 'Setujui Manager (Admin)', '#17262E', '#fff') + B('viewer', 'Setujui sbg Team Leader', '#D9720B', '#241500') : B('viewer', 'Setujui Team Leader', '#D9720B', '#241500') + B('admin', 'Setujui sbg Admin', '#17262E', '#fff');
-        h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;"><div><b>' + esc(p.name) + '</b> <span style="color:#777;">(' + U + ')</span> · <span style="font-size:12px;font-weight:700;color:#D9720B;">Minta: ' + kl + '</span><div style="font-size:11.5px;color:#888;">' + esc((p.requestedAt || '').slice(0,16).replace('T',' ')) + '</div></div><div>' + btns + '<button data-a="reject" data-u="' + U + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Tolak</button></div></div>'; });
+        h += '<div data-q="' + esc((p.name + ' ' + p.username + ' ' + kl + ' permintaan').toLowerCase()) + '" style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;"><div><b>' + esc(p.name) + '</b> <span style="color:#777;">(' + U + ')</span> · <span style="font-size:12px;font-weight:700;color:#D9720B;">Minta: ' + kl + '</span><div style="font-size:11.5px;color:#888;">' + esc((p.requestedAt || '').slice(0,16).replace('T',' ')) + '</div></div><div>' + btns + '<button data-a="reject" data-u="' + U + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Tolak</button></div></div>'; });
       h += '<div style="font-weight:700;margin:14px 0 4px;">Pengguna aktif (' + data.users.length + ')</div>';
       if(!data.users.length) h += '<div style="font-size:13px;color:#777;">Belum ada pengguna selain admin utama.</div>';
-      data.users.forEach(function(u){ h += '<div style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div><b>' + esc(u.name) + '</b> <span style="color:#777;">(' + esc(u.username) + ')</span> · ' + (u.role === 'admin' ? 'Manager / Admin' : u.role === 'sales' ? 'Sales · ' + esc(u.mb || '') : 'Team Leader (Viewer)') + (u.disabled ? ' · <span style="color:#B23A2E;">nonaktif</span>' : '') + '</div><div>'
+      data.users.forEach(function(u){ h += '<div data-q="' + esc((u.name + ' ' + u.username + ' ' + (u.role === 'admin' ? 'manager admin' : u.role === 'sales' ? 'sales salesperson ' + (u.mb || '') : 'team leader viewer') + (u.disabled ? ' nonaktif' : '')).toLowerCase()) + '" style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div><b>' + esc(u.name) + '</b> <span style="color:#777;">(' + esc(u.username) + ')</span> · ' + (u.role === 'admin' ? 'Manager / Admin' : u.role === 'sales' ? 'Sales · ' + esc(u.mb || '') : 'Team Leader (Viewer)') + (u.disabled ? ' · <span style="color:#B23A2E;">nonaktif</span>' : '') + '</div><div>'
         + (u.role === 'sales' ? '' : '<button data-a="role" data-r="' + (u.role === 'admin' ? 'viewer' : 'admin') + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Jadikan ' + (u.role === 'admin' ? 'Team Leader (bukan admin)' : 'Admin') + '</button>')
         + '<button data-a="toggle" data-d="' + (u.disabled ? 0 : 1) + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">' + (u.disabled ? 'Aktifkan' : 'Nonaktifkan') + '</button>'
         + '<button data-a="pw" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Reset password</button>'
@@ -909,6 +962,8 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
 
       d.innerHTML = h;
       d.querySelector('#uc').onclick = function(){ d.remove(); };
+      function filt(){ var q = QS.trim().toLowerCase(), n = 0; d.querySelectorAll('[data-q]').forEach(function(el){ var ok = !q || el.dataset.q.indexOf(q) >= 0; el.style.display = ok ? '' : 'none'; if(ok) n++; }); var em = d.querySelector('#uempty'); if(em) em.style.display = (q && !n) ? 'block' : 'none'; }
+      var us = d.querySelector('#usearch'); if(us){ us.oninput = function(){ QS = us.value; filt(); }; filt(); }
       d.onclick = async function(e){ var t = e.target.closest('button[data-a]'); if(!t) return; var a = t.dataset.a, u = t.dataset.u, res;
         if(a === 'approve') res = await call('/' + encodeURIComponent(u) + '/approve', 'POST', {role: t.dataset.r});
         else if(a === 'reject'){ if(!confirm('Tolak permintaan ' + u + '?')) return; res = await call('/' + encodeURIComponent(u) + '/reject', 'POST', {}); }
@@ -960,7 +1015,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       <div>
         <div class="brand-name">PERFORMANCE DASHBOARD</div>
         <div class="brand-sub">Mitra10 Yogyakarta</div>
-        <div class="brand-byline">By Miranto</div>
+        <div class="brand-byline">Create by Miranto</div>
       </div>
     </div>
     <nav class="nav" id="nav"></nav>
@@ -1466,6 +1521,10 @@ const PERSIST_KEYS = ['salesFact','brandFact','itemFact','itemDayFact','itemMeta
 const PERSIST_CHUNK_SIZE = 3.5 * 1024 * 1024; // chars per chunk, safely under the 5MB/key limit
 
 async function persistState(){
+  if(window.__uploadBegin){ await window.__uploadBegin(); try{ return await __persistState0(); } finally { window.__uploadEnd(); } }
+  return __persistState0();
+}
+async function __persistState0(){
   if(typeof window.storage==='undefined' || !window.storage || typeof window.storage.set!=='function') throw new Error('NO_STORAGE'); // mode file biasa: tidak ada penyimpanan otomatis → jangan buang waktu menyusun data 30+ MB
   const payload = {};
   PERSIST_KEYS.forEach(k => { payload[k] = STATE[k]; });
@@ -1629,6 +1688,52 @@ function spTierToggle(btn){
   panel.querySelectorAll('.sp-tier-detail').forEach(d=>d.style.display='none');
   panel.querySelectorAll('.sp-tier-btn').forEach(b=>{ b.classList.remove('active'); b.textContent = b.disabled ? 'Kosong' : b.textContent.replace('▴','▾'); });
   if(el && open){ el.style.display = 'block'; btn.classList.add('active'); btn.textContent = btn.textContent.replace('▾','▴'); el.scrollIntoView({block:'nearest', behavior:'smooth'}); }
+}
+// ---- Export PDF: Detail Sales Person by Zona (untuk dibagikan, mis. ke WhatsApp) — PDF dibuat langsung di browser, tanpa pustaka luar ----
+function buildTablePdf(opt){ // opt: {title, subtitle, head:[..], body:[[..]], alignRightFrom, footer}
+  const W = 1190.55, H = 841.89, M = 22, enc = s => String(s==null?'':s).replace(/[‐-―]/g,'-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[^\x20-\x7E\xA0-\xFF]/g,'').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+  const cv = document.createElement('canvas').getContext('2d'); const meas = (t,fs,bold) => { cv.font = (bold?'bold ':'')+fs+'px Arial, Helvetica, sans-serif'; return cv.measureText(String(t)).width; };
+  const n = opt.head.length; let fs = 8;
+  const colW = fs0 => opt.head.map((hd,i)=>{ let w = meas(hd,fs0,true); opt.body.forEach(r=>{ w = Math.max(w, meas(r[i],fs0,false)); }); return w + fs0*1.6; });
+  let cw = colW(fs); while(cw.reduce((a,b)=>a+b,0) > W-2*M && fs > 4.6){ fs -= 0.2; cw = colW(fs); }
+  const tot = cw.reduce((a,b)=>a+b,0); if(tot < W-2*M){ const k = (W-2*M)/tot; cw = cw.map(w=>w*Math.min(k,1.25)); }
+  const rh = fs*2.1, top = 62, bottom = 26, perPage = Math.max(1, Math.floor((H-top-bottom-rh)/rh));
+  const pages = []; for(let i=0;i<opt.body.length;i+=perPage) pages.push(opt.body.slice(i,i+perPage)); if(!pages.length) pages.push([]);
+  const objs = []; const add = s => { objs.push(s); return objs.length; };
+  add('<< /Type /Catalog /Pages 2 0 R >>'); add(''); // 2 diisi nanti
+  add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'); add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'); add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>');
+  const kids = []; const f2 = v => (Math.round(v*100)/100).toString();
+  pages.forEach((rows,pi)=>{
+    let c = ''; const y0 = H - top; // y PDF dihitung dari bawah
+    const text = (t,x,y,size,font,rgb) => { c += `BT /${font} ${f2(size)} Tf ${rgb} rg ${f2(x)} ${f2(y)} Td (${enc(t)}) Tj ET\n`; };
+    text(opt.title, M, H-24, 15, 'F2', '0.09 0.15 0.18'); text(opt.subtitle, M, H-40, 8.5, 'F1', '0.35 0.35 0.35');
+    c += `0.09 0.15 0.18 rg ${M} ${f2(y0-rh+2)} ${f2(W-2*M)} ${f2(rh)} re f\n`;
+    let x = M; opt.head.forEach((hd,i)=>{ const tw = meas(hd,fs,true); const tx = i>=opt.alignRightFrom ? x+cw[i]-tw-fs*0.8 : x+fs*0.8; text(hd, tx, y0-rh+2+rh*0.33, fs, 'F2', '1 1 1'); x += cw[i]; });
+    rows.forEach((r,ri)=>{ const yb = y0-rh*(ri+2)+2; if(ri%2===1) c += `0.98 0.97 0.95 rg ${M} ${f2(yb)} ${f2(W-2*M)} ${f2(rh)} re f\n`; c += `0.89 0.87 0.82 RG 0.4 w ${M} ${f2(yb)} m ${f2(W-M)} ${f2(yb)} l S\n`;
+      let xx = M; r.forEach((cell,i)=>{ const tw = meas(cell,fs,false); const tx = i>=opt.alignRightFrom ? xx+cw[i]-tw-fs*0.8 : xx+fs*0.8; text(cell, tx, yb+rh*0.33, fs, 'F1', '0.1 0.1 0.1'); xx += cw[i]; }); });
+    text(opt.footer, M, 12, 8, 'F3', '0.45 0.45 0.45'); const pg = 'Hal. '+(pi+1)+' / '+pages.length; text(pg, W-M-meas(pg,8,false), 12, 8, 'F1', '0.45 0.45 0.45');
+    const cid = add(`<< /Length ${c.length} >>\nstream\n${c}endstream`); const pid = add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents ${cid} 0 R >>`); kids.push(pid);
+  });
+  objs[1] = `<< /Type /Pages /Kids [${kids.map(k=>k+' 0 R').join(' ')}] /Count ${kids.length} >>`;
+  let out = '%PDF-1.4\n', off = []; objs.forEach((o,i)=>{ off.push(out.length); out += `${i+1} 0 obj\n${o}\nendobj\n`; });
+  const xr = out.length; out += `xref\n0 ${objs.length+1}\n0000000000 65535 f \n` + off.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('') + `trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`;
+  const u8 = new Uint8Array(out.length); for(let i=0;i<out.length;i++) u8[i] = out.charCodeAt(i) & 255; return new Blob([u8], {type:'application/pdf'});
+}
+async function exportSpPdf(){
+  const btn = document.getElementById('sp-pdf'), table = document.querySelector('.sp-table'); if(!table) return;
+  const label = btn.textContent; btn.disabled = true; btn.textContent = 'Menyiapkan PDF…';
+  try{
+    await new Promise(r=>setTimeout(r,30));
+    const clean = t => String(t||'').replace(/\s+/g,' ').trim();
+    const head = Array.from(table.querySelectorAll('thead th')).map(th=>clean(th.textContent));
+    const body = Array.from(table.querySelectorAll('tbody tr')).map(tr=>Array.from(tr.cells).map(td=>clean(td.innerText)));
+    const foot = clean((document.getElementById('sidebar-foot')||{}).textContent), filt = clean((document.getElementById('sp-search')||{}).value);
+    const blob = buildTablePdf({ title:'Detail Sales Person by Zona', subtitle:'Mitra10 Yogyakarta - '+foot+' - Dibuat '+new Date().toLocaleString('id-ID')+(filt?(' - Filter: '+filt):'')+' - '+body.length+' salesperson', head, body, alignRightFrom: Math.max(0, head.findIndex(t=>/^rank store$/i.test(t))), footer:'Create by Miranto' });
+    const name = 'Detail_Sales_Person_' + new Date().toISOString().slice(0,10) + '.pdf', file = new File([blob], name, {type:'application/pdf'});
+    if(/Android|iPhone|iPad/i.test(navigator.userAgent) && navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file], title:'Detail Sales Person by Zona'}); return; }catch(e){ if(e && e.name==='AbortError') return; } }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  }catch(e){ alert('Gagal membuat PDF: ' + (e && e.message || e)); }
+  finally{ btn.disabled = false; btn.textContent = label; }
 }
 function spKey(k){ return k==='diffGrowth' ? (r=>r.amt-r.salesLY) : k; }
 function sortKeyFn(k){ if(!k) return null; if(k.startsWith('dc:')){ const site = k.slice(3); return r=>(r.dcByPlace||{})[site]||0; } if(k==='cls') return r=>invClsNorm(r.cls)||null; return k; }
@@ -2839,6 +2944,10 @@ function querySalesperson(curYms, lyYms, filters, dayFilter){
     };
   });
 
+  { // Ranking: Store = seluruh salesperson (tanpa filter), Zona = di dalam zona yang sama; berdasarkan Actual TY pada periode yang dipilih
+    const act = rows.filter(r=>r.amt>0 && !noSp(r.spId)).sort((a,b)=>b.amt-a.amt), zc = {};
+    rows.forEach(r=>{ r.rankStore = 99999; r.rankZona = 99999; });
+    act.forEach((r,i)=>{ r.rankStore = i+1; zc[r.zona] = (zc[r.zona]||0)+1; r.rankZona = zc[r.zona]; }); }
   if(filters.zona) rows = rows.filter(r=>r.zona===filters.zona);
   if(filters.kriteria) rows = rows.filter(r=>r.kriteria===filters.kriteria);
   if(filters.tl) rows = rows.filter(r=> filters.tl==='__none__' ? !r.tl : r.tl===filters.tl);
@@ -5263,10 +5372,11 @@ RENDERERS.salesperson = function(container){
       <div class="panel">
         <div class="panel-head"><div class="panel-title">Detail Sales Person by Zona</div>
           <div class="panel-note">Nilai dalam Rupiah (Jt = juta, M = miliar). Nama, kriteria (SPP = Supplier, PB = Private Brand, TL = Team Leader), dan brand dipersingkat — arahkan kursor untuk teks lengkap. Klik header untuk mengurutkan.</div>
-          <input class="search-box" id="sp-search" placeholder="Cari nama / ID..."></div>
+          <input class="search-box" id="sp-search" placeholder="Cari nama / ID..."><button class="btn" id="sp-pdf" type="button" style="margin-left:8px;">⬇ Export PDF</button></div>
         <div class="tbl-scroll sp-fit"><table class="sp-table">
           <thead><tr>
             <th data-sort="spId">ID Salper</th><th data-sort="spName">Nama Salper</th><th data-sort="zona">Zona</th><th data-sort="kriteria">Kriteria</th><th data-sort="masterBrand">Brand</th><th data-sort="tl">TL Mentor</th>
+            <th class="num" data-sort="rankStore" title="Ranking Actual TY di seluruh store (semua salesperson)">Rank Store</th><th class="num" data-sort="rankZona" title="Ranking Actual TY di dalam zona yang sama">Rank Zona</th>
             <th class="num" data-sort="budget">Budget</th><th class="num" data-sort="amt">Actual TY</th><th class="num" data-sort="salesLY">Actual LY</th>
             <th class="num" data-sort="achieve">Achieve</th><th class="num" data-sort="diffBudget">Diff Budget</th><th class="num" data-sort="growth">Growth</th><th class="num" data-sort="diffGrowth">Diff Growth</th>
             <th class="num" data-sort="ipd" title="Invoice per Day (hari salesperson membuat invoice)">IPD</th><th class="num" data-sort="ipi" title="Item per Invoice">IPI</th>
@@ -5294,6 +5404,7 @@ RENDERERS.salesperson = function(container){
           <td><span class="zona-tag"><span class="zona-dot" style="background:${ZONA_COLOR[r.zona]||'#999'}"></span>${r.zona}</span></td>
           <td title="${r.kriteria||'-'}">${abbrKriteria(r.kriteria||'-')}</td>
           <td title="${r.masterBrand||'-'}">${r.masterBrand||'-'}</td><td title="${r.tl||'-'}">${r.tl||'-'}</td>
+          <td class="num">${r.rankStore<99999?'#'+r.rankStore:'-'}</td><td class="num">${r.rankZona<99999?'#'+r.rankZona:'-'}</td>
           <td class="num">${r.budget?fmtRp(r.budget,{noPrefix:true}):'-'}</td>
           <td class="num">${fmtRp(r.amt,{noPrefix:true})}</td>
           <td class="num">${fmtRp(r.salesLY,{noPrefix:true})}</td>
@@ -5312,6 +5423,7 @@ RENDERERS.salesperson = function(container){
     renderTbl();
     attachSort(document.getElementById('sp-tbody').closest('table'), spSort, ()=>renderTbl(document.getElementById('sp-search').value));
     document.getElementById('sp-search').addEventListener('input', e=>renderTbl(e.target.value));
+    document.getElementById('sp-pdf').addEventListener('click', ()=>exportSpPdf());
     mkChart('chart-sp-top', {
       type:'bar',
       data:{ labels: top15.map(p=>p.spName), datasets:[{label:'Sales TY', data: top15.map(p=>p.amt), backgroundColor:'#2B4C5C', borderRadius:4}] },

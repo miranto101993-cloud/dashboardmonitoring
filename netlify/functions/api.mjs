@@ -167,16 +167,22 @@ function scopedFor(eff, spId) {
   return { user: { spId: (row && row.spId) || spId, name: (row && row.spName) || (sp[0] && sp[0].spName) || spId, zona, kriteria: row ? row.kriteria : '', mb, tl }, brandMode, spFact: sp, itemFact, itemDayFact, itemMeta, budget, brandBudget, budgetDay: bd,
     meta: { latestMonth2026: eff.meta.latestMonth2026, latestDate2026: eff.meta.latestDate2026, years: eff.meta.years }, sales: { from: sm.from, to: eff.meta.latestDate2026 || sm.to }, stock: { date: dm.sqv && dm.sqv.stockDate, dc: dm.dc && dm.dc.reportDate } };
 }
-// ranking: hanya nomor urut di antara Salesperson sekelompok (Kriteria + Zona yang sama); angka milik orang lain tidak dikirim
+// ranking: hanya nomor urut — Store (semua salesperson) dan Zona (zona yang sama); angka milik orang lain tidak dikirim. Sama seperti dashboard utama (berdasarkan Actual pada periode).
 function rankFor(eff, spId, from, to) {
-  const id = normId(spId), row = eff.salperFact.find((r) => normId(r.spId) === id); if (!row) return { rank: null, of: 0 };
-  const peers = new Set(eff.salperFact.filter((r) => r.kriteria === row.kriteria && r.zona === row.zona).map((r) => normId(r.spId)));
-  const tot = new Map(); for (const r of eff.spFact) { if (!r.d || r.y !== 2026) continue; const k = normId(r.spId); if (!peers.has(k)) continue; const s = ymdOf(r); if (s < from || s > to) continue; tot.set(k, (tot.get(k) || 0) + (r.amt || 0)); }
-  const mine = tot.get(id) || 0; if (mine <= 0) return { rank: null, of: [...tot.values()].filter((v) => v > 0).length, group: row.kriteria + ' ' + row.zona };
-  let better = 0, n = 0; for (const v of tot.values()) { if (v > 0) n++; if (v > mine) better++; }
-  return { rank: better + 1, of: n, group: row.kriteria + ' ' + row.zona };
+  const id = normId(spId), row = eff.salperFact.find((r) => normId(r.spId) === id); if (!row) return { store: null, zona: null };
+  const zonaOfSp = new Map(eff.salperFact.map((r) => [normId(r.spId), r.zona]));
+  const tot = new Map(); for (const r of eff.spFact) { if (!r.d || r.y !== 2026 || !r.spId || String(r.spId).toLowerCase() === 'null') continue; const s = ymdOf(r); if (s < from || s > to) continue; const k = normId(r.spId); tot.set(k, (tot.get(k) || 0) + (r.amt || 0)); }
+  const mine = tot.get(id) || 0, out = { zonaName: row.zona, store: null, storeOf: 0, zona: null, zonaOf: 0 };
+  let bs = 0, ns = 0, bz = 0, nz = 0;
+  for (const [k, v] of tot) { if (v <= 0) continue; ns++; if (v > mine) bs++; if (zonaOfSp.get(k) === row.zona) { nz++; if (v > mine) bz++; } }
+  out.storeOf = ns; out.zonaOf = nz; if (mine > 0) { out.store = bs + 1; out.zona = bz + 1; }
+  return out;
 }
 async function salesMap() { const eff = await effective(); const m = new Map(); eff.salperFact.forEach((r) => { if (r.spId) m.set(normId(r.spId), { id: r.spId, name: r.spName, zona: r.zona, mb: r.masterBrand }); }); return m; }
+// ---------- kunci unggah: hanya satu admin yang boleh menyimpan data pada satu waktu (mencegah data admin lain tertimpa) ----------
+const LOCK_MS = 8 * 60e3;
+async function getLock() { try { const v = await store().get('lock', { type: 'text' }); const o = v ? JSON.parse(v) : null; return o && o.exp > Date.now() ? o : null; } catch { return null; } }
+const setLock = (me) => store().set('lock', JSON.stringify({ user: me.user, name: me.name || me.user, since: Date.now(), exp: Date.now() + LOCK_MS }));
 const rndPw = () => { const al = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const b = randomBytes(10); let s = ''; for (let i = 0; i < 10; i++) s += al[b[i] % al.length]; return s; };
 
 export default async (req) => {
@@ -251,6 +257,17 @@ export default async (req) => {
         return json(rankFor(await effective(), me.spId, f, t));
       }
       return json({ error: 'Akun Salesperson hanya dapat melihat data miliknya.' }, 403);
+    }
+
+    if (path === 'lock') {
+      if (role !== 'admin') return json({ error: 'Khusus admin.' }, 403);
+      const lk = await getLock(); const rev = (await store().get('rev')) || '0';
+      if (method === 'GET') return json({ rev, lock: lk ? { holder: lk.name, mine: lk.user === me.user, exp: lk.exp } : null });
+      let b = {}; try { b = await req.json(); } catch {}
+      if (b.action === 'release') { if (lk && lk.user === me.user) await store().delete('lock'); return json({ ok: true, rev }); }
+      if (lk && lk.user !== me.user) return json({ ok: false, locked: true, holder: lk.name, error: 'Admin lain (' + lk.name + ') sedang mengunggah / menyimpan data. Tunggu selesai, lalu muat ulang halaman.' }, 423);
+      if (b.rev !== undefined && String(b.rev) !== rev) return json({ ok: false, stale: true, error: 'Data di server sudah diperbarui oleh admin lain setelah halaman ini dibuka. Muat ulang halaman, lalu unggah ulang file Anda.' }, 409);
+      await setLock(me); return json({ ok: true, rev });
     }
 
     // ---------- kelola pengguna (admin) ----------
@@ -338,16 +355,21 @@ export default async (req) => {
         return text(v, 200, { 'cache-control': url.searchParams.get('v') ? 'private, max-age=31536000, immutable' : 'no-store' });
       }
       if (role !== 'admin') return json({ error: 'Hanya admin yang boleh mengubah data.' }, 403);
+      const isMeta = /(^|[:_])meta$/.test(key);
+      if (!(method === 'DELETE' && /^v[a-z0-9]+:chunk:\d+$/i.test(key))) { // pembersihan versi lama boleh tanpa kunci; selain itu wajib memegang kunci unggah
+        const lk = await getLock();
+        if (!lk || lk.user !== me.user) return json({ error: lk ? 'Admin lain (' + lk.name + ') sedang menyimpan data. Coba lagi setelah selesai.' : 'Kunci unggah belum diambil. Muat ulang halaman lalu coba lagi.', locked: true }, 423);
+        await setLock(me);
+        if (isMeta) { const base = req.headers.get('x-base-rev'), cur = (await store().get('rev')) || '0'; if (base !== null && base !== cur) return json({ error: 'Data di server sudah diperbarui oleh admin lain setelah halaman ini dibuka. Muat ulang halaman, lalu unggah ulang file Anda.', stale: true }, 409); }
+      }
       if (method === 'PUT') {
         const body = await req.text();
         if (body.length > 5.5 * 1024 * 1024) return json({ error: 'Data terlalu besar untuk satu bagian.' }, 413);
         await store().set('kv/' + key, body);
-        const isMeta = /(^|[:_])meta$/.test(key);
         return json({ ok: true, ...(isMeta ? { rev: await touchRev() } : {}) });
       }
       if (method === 'DELETE') {
         await store().delete('kv/' + key);
-        const isMeta = /(^|[:_])meta$/.test(key);
         return json({ ok: true, ...(isMeta ? { rev: await touchRev() } : {}) });
       }
     }
