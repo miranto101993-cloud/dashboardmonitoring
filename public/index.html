@@ -747,15 +747,32 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       return h;
     }
 
+    /* ---------- tab: Belting (khusus Sales Private Brand; dicocokkan lewat nama) ---------- */
+    var BELT_C = {Gold:['#C9A227','#fff'], SilverA:['#7C858E','#fff'], SilverB:['#A3AAB1','#1F2A2E'], SilverC:['#C6CACF','#1F2A2E'], BronzeA:['#9A5B28','#fff'], BronzeB:['#B8803F','#fff'], BronzeC:['#D0A262','#1F2A2E'], BronzeD:['#E3C597','#1F2A2E'], Rusted:['#8B3A2B','#fff']};
+    function pill(pos){ var c = BELT_C[pos] || ['#9AA7A0', '#fff']; return '<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-weight:800;font-size:12px;background:' + c[0] + ';color:' + c[1] + ';">' + esc(pos || '-') + '</span>'; }
+    function sc(v){ return v == null || !isFinite(v) ? '–' : (Math.round(v * 100) / 100).toLocaleString('id-ID'); }
+    function beltHtml(){
+      var B = D.belting || {rows:[]}, rows = (B.rows || []).slice().sort(function(a, b){ return b.pKey - a.pKey; });
+      if(!rows.length) return '<div class="sx-panel"><div class="sx-empty">Data Belting Private Brand untuk <b>' + esc(U.name) + '</b> belum ditemukan. Pencocokan dilakukan lewat <b>nama</b> (file belting tidak memuat ID Salper). Hubungi admin bila nama Anda di file belting berbeda penulisannya.</div></div>';
+      var L = rows[0], prev = rows[1];
+      var h = '<div class="sx-note" style="margin:0 0 8px;">Belting <b>Private Brand</b> atas nama <b>' + esc(B.name || U.name) + '</b> (dicocokkan lewat nama).</div>'
+        + '<div class="sx-panel" style="margin-top:0;"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><div><div style="font-size:12px;color:' + SOFT + ';font-weight:700;">Posisi Belting Terakhir · ' + esc(L.pLabel) + '</div><div style="margin-top:6px;font-size:18px;">' + pill(L.pos) + '</div></div>'
+        + (prev ? '<div style="font-size:12px;color:' + SOFT + ';">Sebelumnya (' + esc(prev.pLabel) + '): ' + pill(prev.pos) + '</div>' : '') + '</div>'
+        + '<div class="sx-cards" style="margin-top:12px;">' + card('Performance', sc(L.perf), 'Score ' + esc(L.pLabel)) + card('Competency', sc(L.comp), 'Score') + card('LMS Learning Path', sc(L.lms), 'Score') + (L.s360 != null ? card('360 Degree', sc(L.s360), 'Score') : '') + (L.tech != null ? card('Technical Course', sc(L.tech), 'Score') : '') + '</div></div>'
+        + '<div class="sx-panel"><div style="font-weight:800;margin-bottom:8px;">Riwayat Belting</div><div style="overflow:auto;"><table class="sx-t" style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:#1F3A68;color:#fff;"><th style="padding:7px 8px;text-align:left;">Periode</th><th style="padding:7px 8px;">Posisi</th><th style="padding:7px 8px;">Perf.</th><th style="padding:7px 8px;">Comp.</th><th style="padding:7px 8px;">LMS</th><th style="padding:7px 8px;">360</th><th style="padding:7px 8px;">Tech</th></tr></thead><tbody>'
+        + rows.map(function(r){ return '<tr style="border-bottom:1px solid ' + LINE + ';text-align:center;"><td style="padding:7px 8px;text-align:left;font-weight:700;">' + esc(r.pLabel) + '</td><td>' + pill(r.pos) + '</td><td>' + sc(r.perf) + '</td><td>' + sc(r.comp) + '</td><td>' + sc(r.lms) + '</td><td>' + sc(r.s360) + '</td><td>' + sc(r.tech) + '</td></tr>'; }).join('')
+        + '</tbody></table></div></div>';
+      return h;
+    }
     function draw(){
       try{ sessionStorage.setItem('sx_state', JSON.stringify(S)); }catch(e){}
       if(S.per === 'month' && S.week && weeksOf(S.month).every(function(w){ return w.w !== S.week; })) S.week = 0;
       var P = period(); curKey = P.s + '|' + P.e;
-      var body; try{ body = S.tab === 'me' ? meHtml() : S.tab === 'item' && hasBrand ? itemHtml() : brandHtml(); }catch(ex){ body = '<div class="sx-panel"><div class="sx-empty">Terjadi kesalahan menampilkan data. Muat ulang halaman.</div></div>'; if(window.console) console.error(ex); }
+      var body; try{ body = S.tab === 'me' ? meHtml() : S.tab === 'belt' && isPB ? beltHtml() : S.tab === 'item' && hasBrand ? itemHtml() : brandHtml(); }catch(ex){ body = '<div class="sx-panel"><div class="sx-empty">Terjadi kesalahan menampilkan data. Muat ulang halaman.</div></div>'; if(window.console) console.error(ex); }
       root.innerHTML = '<div class="sx-top"><div class="sx-top-in"><div class="sx-row"><div><div class="sx-name">' + esc(U.name) + '</div><div class="sx-id">' + esc(U.spId) + ' · Mitra10 Yogyakarta</div></div><button class="sx-out" id="sx-out">Keluar</button></div>'
         + '<div class="sx-chips">' + (U.zona ? '<span class="sx-chip">Zona: <b>' + esc(U.zona) + '</b></span>' : '') + '<span class="sx-chip">Master Brand: <b>' + esc(U.mb || '-') + '</b></span>' + (U.tl ? '<span class="sx-chip">TL: <b>' + esc(U.tl) + '</b></span>' : '') + '<span class="sx-chip">Data s/d <b>' + esc(fDate(latestD)) + '</b></span></div></div></div>'
         + '<div class="sx-bar"><div class="sx-wrap" style="padding:0;">' + controls(P) + '</div></div>'
-        + '<div class="sx-wrap"><div class="sx-tabs"><button data-tab="me" class="' + (S.tab === 'me' ? 'on' : '') + '">Sales Saya</button><button data-tab="brand" class="' + (S.tab === 'brand' ? 'on' : '') + '">Master Brand</button>' + (hasBrand ? '<button data-tab="item" class="' + (S.tab === 'item' ? 'on' : '') + '">Item Detail</button>' : '') + '</div>'
+        + '<div class="sx-wrap"><div class="sx-tabs"><button data-tab="me" class="' + (S.tab === 'me' ? 'on' : '') + '">Sales Saya</button><button data-tab="brand" class="' + (S.tab === 'brand' ? 'on' : '') + '">Master Brand</button>' + (hasBrand ? '<button data-tab="item" class="' + (S.tab === 'item' ? 'on' : '') + '">Item Detail</button>' : '') + (isPB ? '<button data-tab="belt" class="' + (S.tab === 'belt' ? 'on' : '') + '">Belting</button>' : '') + '</div>'
         + body + '<div class="sx-note" style="text-align:center;margin-top:18px;">Anda hanya dapat melihat data Sales Anda dan master brand Anda.<br><i>Create by Miranto</i></div></div>';
       root.querySelector('#sx-out').onclick = onLogout;
       root.querySelectorAll('[data-per]').forEach(function(b){ b.onclick = function(){ S.per = b.dataset.per; S.week = 0; S.limit = 50; draw(); }; });

@@ -97,6 +97,29 @@ async function loadPayload() {
   }
   return JSON.parse(s);
 }
+
+// Belting Private Brand: dicocokkan ke salesperson lewat NAMA (file belting tidak punya ID Salper). Data bawaan dari data/belting.json; hasil upload admin (payload) dipakai bila ada.
+let _belt = null;
+function beltSeed() { if (_belt) return _belt; try { const f = dataFile('belting.json'); _belt = f ? JSON.parse(readFileSync(f, 'utf8')) : []; } catch { _belt = []; } return _belt; }
+const nmToks = (s) => { const out = []; for (const t of String(s || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/)) if (t && out[out.length - 1] !== t && !out.includes(t)) out.push(t); return out; };
+function lev1(a, b) { if (a === b) return true; if (Math.abs(a.length - b.length) > 1 || Math.min(a.length, b.length) < 4) return false; let i = 0, j = 0, d = 0; while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; continue; } if (++d > 1) return false; if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } } return d + (a.length - i) + (b.length - j) <= 1; }
+const tokOk = (a, b) => a === b || a.startsWith(b) || b.startsWith(a) || lev1(a, b);
+// cocok bila token nama yang lebih pendek semuanya cocok berurutan dengan nama yang lebih panjang (singkatan/salah ketik kecil diperbolehkan), minimal 2 token (atau 1 token yang sama persis)
+function nameMatch(a, b) { const A = nmToks(a), B = nmToks(b); if (!A.length || !B.length) return false; const [sh, lg] = A.length <= B.length ? [A, B] : [B, A]; if (sh.length === 1) return lg.length === 1 && sh[0] === lg[0]; let k = 0; for (const t of sh) { while (k < lg.length && !tokOk(t, lg[k])) k++; if (k >= lg.length) return false; k++; } return tokOk(sh[0], lg[0]); }
+// pemetaan manual (nama di file belting terlalu umum untuk dicocokkan otomatis): ID Salper -> nama di file belting
+const BELT_ALIAS = { 'S80000-0000000465': 'Putri Indrawati', 'S80000-0000000181': 'Pandu Bahari', 'S80000-0000000532': 'Wahyu Nugroho', 'S80000-0000000336': 'Wahyu Nugroho' };
+function beltingFor(eff, row) {
+  const all = eff.beltingPB || []; if (!row || !all.length) return { rows: [], name: '' };
+  const al = BELT_ALIAS[normId(row.spId)] || BELT_ALIAS[String(row.spId || '').toUpperCase()];
+  if (al) { const rows = all.filter((r) => r.name === al).sort((a, b) => (a.pKey || 0) - (b.pKey || 0)).map((r) => ({ pLabel: r.pLabel, pKey: r.pKey, job: r.job, location: r.location, level: r.level, lms: r.lms, s360: r.s360, tech: r.tech, comp: r.comp, perf: r.perf, pos: r.pos })); if (rows.length) return { rows, name: al }; }
+  const pbRoster = (eff.salperFact || []).filter((r) => String(r.masterBrand || '').trim().toLowerCase() === 'private brand');
+  const names = [...new Set(all.map((r) => r.name))];
+  const mine = names.filter((n) => nameMatch(n, row.spName) && pbRoster.filter((r) => nameMatch(n, r.spName)).length === 1);
+  if (!mine.length) return { rows: [], name: '' };
+  const pick = mine.length > 1 ? [mine.find((n) => nmToks(n).join(' ') === nmToks(row.spName).join(' ')) || mine[0]] : mine;
+  const rows = all.filter((r) => pick.includes(r.name)).sort((a, b) => (a.pKey || 0) - (b.pKey || 0)).map((r) => ({ pLabel: r.pLabel, pKey: r.pKey, job: r.job, location: r.location, level: r.level, lms: r.lms, s360: r.s360, tech: r.tech, comp: r.comp, perf: r.perf, pos: r.pos }));
+  return { rows, name: pick[0] };
+}
 let _eff = null, _effRev = null; const _scoped = new Map();
 const ymdOf = (r) => r.y + '-' + String(r.m).padStart(2, '0') + '-' + String(r.d).padStart(2, '0');
 async function effective() {
@@ -126,7 +149,7 @@ async function effective() {
   const smTo = dm.sales && dm.sales.to ? String(dm.sales.to).slice(0, 10) : ''; if (smTo > maxD) maxD = smTo;
   const meta = { ...(seed.meta || {}), years: (seed.meta && seed.meta.years) || [2025, 2026] };
   if (maxD) { meta.latestDate2026 = maxD; meta.latestMonth2026 = +maxD.slice(5, 7); }
-  _eff = { spFact, salperFact: sp.salperFact, budgetSalperFact: sp.budgetSalperFact, tlMentor: sp.tlMentor, itemFact: pick('itemFact'), itemDayFact, budgetDailyFact: pick('budgetDailyFact'), budgetPBFact: pick('budgetPBFact'), sqvItems: sqv.sqvItems, dcByItem: dcg, itemMeta: mergePb((pl && pl.itemMeta) || seed.itemMeta || {}, seed.itemMeta || {}), meta, dataMeta: dm };
+  _eff = { beltingPB: (pl && Array.isArray(pl.beltingPB) && pl.beltingPB.length) ? pl.beltingPB : beltSeed(), spFact, salperFact: sp.salperFact, budgetSalperFact: sp.budgetSalperFact, tlMentor: sp.tlMentor, itemFact: pick('itemFact'), itemDayFact, budgetDailyFact: pick('budgetDailyFact'), budgetPBFact: pick('budgetPBFact'), sqvItems: sqv.sqvItems, dcByItem: dcg, itemMeta: mergePb((pl && pl.itemMeta) || seed.itemMeta || {}, seed.itemMeta || {}), meta, dataMeta: dm };
   _effRev = rev; _scoped.clear(); return _eff;
 }
 const ZONA_MAP = { 'FLOORING AND WALL': 'Zona 1', 'BATHROOM': 'Zona 2', 'PLUMBING': 'Zona 2', 'APPLIANCES': 'Zona 3', 'DOORS AND WINDOWS': 'Zona 3', 'ELECTRICAL AND LIGHTING': 'Zona 3', 'HARDWARE': 'Zona 3', 'HOUSEWARE & HOBBIES': 'Zona 3', 'HOBBIES': 'Zona 3', 'KITCHEN': 'Zona 3', 'TOOLS': 'Zona 3', 'MISCELLANEOUS': 'Zona 3', 'BUILDING MATERIAL': 'Zona 4', 'PAINT AND SUNDRIES': 'Zona 4' };
@@ -165,7 +188,7 @@ function scopedFor(eff, spId) {
   const bd = {}; for (const r of eff.budgetDailyFact || []) { const a = bd[r.m] || (bd[r.m] = []); a[r.d - 1] = (a[r.d - 1] || 0) + (r.value || 0); }
   const dm = eff.dataMeta || {}, sm = dm.sales || {};
   return { user: { spId: (row && row.spId) || spId, name: (row && row.spName) || (sp[0] && sp[0].spName) || spId, zona, kriteria: row ? row.kriteria : '', mb, tl }, brandMode, spFact: sp, itemFact, itemDayFact, itemMeta, budget, brandBudget, budgetDay: bd,
-    meta: { latestMonth2026: eff.meta.latestMonth2026, latestDate2026: eff.meta.latestDate2026, years: eff.meta.years }, sales: { from: sm.from, to: eff.meta.latestDate2026 || sm.to }, stock: { date: dm.sqv && dm.sqv.stockDate, dc: dm.dc && dm.dc.reportDate } };
+    belting: isPB ? beltingFor(eff, row) : undefined, meta: { latestMonth2026: eff.meta.latestMonth2026, latestDate2026: eff.meta.latestDate2026, years: eff.meta.years }, sales: { from: sm.from, to: eff.meta.latestDate2026 || sm.to }, stock: { date: dm.sqv && dm.sqv.stockDate, dc: dm.dc && dm.dc.reportDate } };
 }
 // ranking: hanya nomor urut — Store (semua salesperson) dan Zona (zona yang sama); angka milik orang lain tidak dikirim. Sama seperti dashboard utama (berdasarkan Actual pada periode).
 function rankFor(eff, spId, from, to) {

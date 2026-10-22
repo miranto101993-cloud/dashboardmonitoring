@@ -12,3 +12,6 @@ Diuji lokal (server Node + Blobs tiruan), belum di Netlify sungguhan.
 
 ## Kunci unggah (mencegah data tertimpa)
 Saat admin memilih file untuk diunggah, server memberi "kunci" ke admin itu (berlaku 8 menit, dilepas otomatis setelah tersimpan). Admin lain yang mencoba mengunggah/menyimpan pada saat itu mendapat pesan "sedang dikunci". Server juga menolak penyimpanan dari halaman yang datanya sudah lebih lama dari versi terbaru di server (muncul pesan "Data sudah diperbarui admin lain" → muat ulang, lalu unggah ulang file).
+
+## Belting untuk Sales Private Brand
+Login Sales dengan Master Brand "Private Brand" mendapat tab **Belting** (posisi terakhir, skor, riwayat). File belting tidak memiliki ID Salper, jadi pencocokan dilakukan lewat **nama** (singkatan/salah ketik kecil ditoleransi; nama yang ambigu tidak ditampilkan agar tidak salah orang). Setiap sales hanya melihat belting miliknya sendiri.
