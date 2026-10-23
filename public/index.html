@@ -314,7 +314,7 @@ th[data-sort]{ cursor:pointer; user-select:none; } th[data-sort]:hover{ backgrou
 .cu-act{ border:1px solid var(--line,#E6E2D6); background:#fff; border-radius:8px; height:32px; padding:0 10px; font:inherit; font-size:12px; font-weight:600; cursor:pointer; } .cu-act:hover{ background:#FBEFD9; }
 .sp-mt{ border-collapse:separate; border-spacing:0; font-size:12px; width:max-content; min-width:100%; }
 .sp-mt th,.sp-mt td{ padding:3px 10px; white-space:nowrap; text-align:center; border-bottom:1px solid #EEEAE0; }
-.sp-mt thead th{ white-space:normal; width:1px; background:#2B4C5C; color:#fff; font-size:11px; line-height:1.25; vertical-align:middle; }
+.sp-mt thead th{ position:sticky; top:0; z-index:2; white-space:normal; width:1px; background:#2B4C5C; color:#fff; font-size:11px; line-height:1.25; vertical-align:middle; }
 .sp-mt td:first-child{ text-align:left; font-weight:600; }
 .sp-mt .sp-mt-tot td{ background:#F6F3EA; border-top:2px solid #D8D2C0; }
 .sp-mcs{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:12px; }
@@ -1415,6 +1415,7 @@ const STATE = {
   sourceFact: [...SEED.sourceFact],     // {y,m,source,amt,invoice}
   sourceDailyFact: [...(SEED.sourceDailyFact||[])], // {y,m,d,source,amt,invoice} — day-level Source Type breakdown (populated from data uploaded/refreshed after this feature was added)
   notaFact: [...SEED.notaFact],         // {y,m,nota,amt}
+  spCatFact: [...(SEED.spCatFact||[])], // {y,m,d,spId,cat,amt} — penjualan tiap salesperson per Kategori (Jendela Zona pada Detail Sales Person)
   notaCatFact: [...(SEED.notaCatFact||[])], // {y,m,d,nota,cat,amt} — per-nota amount split by product Category, used for TIEBS Zona/Category filter
   memberDb: loadMemberSeed(), // {k,no,n,p,c} — Database Customer/Member (upload): k=kunci nomor member ternormalisasi, no=nomor asli, n=nama, p=phone, c=kriteria (Bispro/Regular)
   memberTxSeed: loadMemberTxSeed(), // bawaan dashboard (tidak ikut disimpan ulang)
@@ -1547,7 +1548,7 @@ function dcSiteList(){
 // as possible (few large requests, not many small ones — avoids rate limits).
 // ============================================================
 const PERSIST_PREFIX = 'retailpulse_v2_';
-const PERSIST_KEYS = ['salesFact','brandFact','itemFact','itemDayFact','itemMeta','spFact','sourceFact','sourceDailyFact','hourFact','brandDayFact','sourceZonaFact','notaFact','notaCatFact','dcAging','dataMeta',
+const PERSIST_KEYS = ['salesFact','brandFact','itemFact','itemDayFact','itemMeta','spFact','sourceFact','sourceDailyFact','hourFact','brandDayFact','sourceZonaFact','notaFact','notaCatFact','spCatFact','dcAging','dataMeta',
   'budgetStoreFact','budgetPBFact','budgetDailyFact','budgetProjectMonthly','sqvItems',
   'dcByItem','dcBySite','dcBySiteStatus','dcSites','uploadStatus','trafficFact','salperFact','tlMentor','budgetSalperFact','sourceKpi','kpiMatrix','beltingInternal','beltingPB','memberDb','memberTx'];
 const PERSIST_CHUNK_SIZE = 3.5 * 1024 * 1024; // chars per chunk, safely under the 5MB/key limit
@@ -1728,6 +1729,22 @@ function spmAgg(list, isTL){
   if(!isTL && list.length===1){ const r = list[0]; o.ipd = r.ipd; o.ipi = r.ipi; o.rankStore = r.rankStore; o.rankZona = r.rankZona; }
   o.ach = o.budget ? o.amtB/o.budget : null; o.gr = o.ly ? (o.amt-o.ly)/o.ly : null; return o;
 }
+// ---- Penjualan per kategori di dalam satu Zona (klik Zona pada Detail Sales Person by Zona) ----
+function spZonaOpen(zona, spId){
+  const C = window.__spCtx; if(!C) return;
+  const cs = new Set(C.curYms.map(x=>x.y+'-'+x.m)), inR = r => !C.dayFilter || (r.d>=C.dayFilter.from && r.d<=C.dayFilter.to);
+  const info = (querySalesperson(C.curYms, C.lyYms, {}, C.dayFilter).byZona.find(r=>r.spId===spId)) || {spId, spName:spId, zona, tl:''};
+  const inZ = new Map(), outZ = new Map(); let outTot = 0;
+  // kategori milik zona (sesuai pemetaan zona per bulan) — semua tampil, walau nilainya 0
+  (STATE.salesFact||[]).forEach(r=>{ if(cs.has(r.y+'-'+r.m) && catToZona(r.cat, r.m)===zona && !inZ.has(r.cat)) inZ.set(r.cat, 0); });
+  (STATE.spCatFact||[]).forEach(r=>{ if(r.spId!==spId || !cs.has(r.y+'-'+r.m) || !inR(r)) return;
+    if(catToZona(r.cat, r.m)===zona) inZ.set(r.cat, (inZ.get(r.cat)||0) + r.amt); else outTot += r.amt; });
+  const list = [...inZ.entries()].sort((a,b)=>b[1]-a[1]), tot = list.reduce((a,x)=>a+x[1],0), fmt = v=>Math.round(v).toLocaleString('id-ID'), tc = v=>String(v||'').toLowerCase().replace(/(^|[\s&/-])([a-z])/g,(m,a,b)=>a+b.toUpperCase());
+  const hasData = (STATE.spCatFact||[]).some(r=>r.spId===spId);
+  custModal(`<div class="cu-box" style="width:min(560px,100%);"><div class="cu-box-head"><div style="line-height:1.5;"><b style="font-size:15px;">Ringkasan Transaksi</b><div>ID Name : ${info.spId} <b>${info.spName}</b> ${zona}</div><div>Mentor : ${info.tl||'-'}</div><div style="color:#6F6A58;font-size:12px;">Periode : ${C.label}</div></div><button class="cu-close" type="button">×</button></div>
+    <div style="padding:12px 16px 16px;"><table class="sp-mt" style="width:100%;"><thead><tr><th style="text-align:left;">Category</th><th>Sales Value</th></tr></thead><tbody>${list.map(([c,v])=>`<tr><td>${tc(c)}</td><td style="text-align:right;">${fmt(v)}</td></tr>`).join('') || '<tr><td colspan="2" style="text-align:center;padding:14px;">Belum ada kategori untuk zona ini.</td></tr>'}<tr class="sp-mt-tot"><td><b>Total</b></td><td style="text-align:right;"><b>${fmt(tot)}</b></td></tr></tbody></table>
+    <div style="font-size:11px;color:#8A8573;margin-top:8px;">${hasData ? 'Penjualan salesperson ini pada kategori milik '+zona+' (Rp, sebelum pajak). '+(outTot>0?'Penjualan di luar kategori zona: Rp '+fmt(outTot)+' (tidak dihitung).':'') : 'Data per kategori belum tersedia — unggah ulang file sales (Upload Data) agar terisi.'} <i>Create by Miranto</i></div></div></div>`);
+}
 function spmLine(title, labels, series, fmt, refY){
   const W = 360, H = 138, L = 46, R = 8, T = 16, B = 20, n = labels.length;
   let vals = []; series.forEach(s=>s.v.forEach(v=>{ if(v!==null && isFinite(v)) vals.push(v); })); if(refY!==undefined) vals.push(refY);
@@ -1829,7 +1846,7 @@ function spmOpen(kind, key){
   custModal(`<div class="cu-box"><div class="cu-box-head"><div style="line-height:1.5;">${head}</div><div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;justify-content:flex-end;"><button type="button" class="cu-act spm-jpg">📷 Foto JPG</button><button type="button" class="cu-act spm-xls">⬇ Excel</button><button class="cu-close" type="button">×</button></div></div>
     <div style="padding:12px 16px 16px;"><div class="tbl-scroll"><table class="sp-mt"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${per.map(p=>cell(p.o, MONTH_NAMES[p.m-1]+' '+cy, false)).join('')}${cell(tot,'Total',true)}</tbody></table></div>${charts}</div></div>`);
 }
-document.addEventListener('click', e=>{ const t = e.target.closest && e.target.closest('.spm-jpg,.spm-xls'); if(t){ e.preventDefault(); if(t.classList.contains('spm-jpg')){ const l = t.textContent; t.disabled = true; t.textContent = 'Menyiapkan…'; spmJpg().catch(x=>alert('Gagal membuat JPG: '+(x&&x.message||x))).finally(()=>{ t.disabled = false; t.textContent = l; }); } else spmExcel(); return; } const b = e.target.closest && e.target.closest('.sp-open'); if(b){ e.preventDefault(); spmOpen(b.dataset.tl!==undefined?'tl':'sp', b.dataset.tl!==undefined?b.dataset.tl:b.dataset.sp); } });
+document.addEventListener('click', e=>{ const zb = e.target.closest && e.target.closest('.sp-zona-open'); if(zb){ e.preventDefault(); spZonaOpen(zb.dataset.zona, zb.dataset.sp); return; } const t = e.target.closest && e.target.closest('.spm-jpg,.spm-xls'); if(t){ e.preventDefault(); if(t.classList.contains('spm-jpg')){ const l = t.textContent; t.disabled = true; t.textContent = 'Menyiapkan…'; spmJpg().catch(x=>alert('Gagal membuat JPG: '+(x&&x.message||x))).finally(()=>{ t.disabled = false; t.textContent = l; }); } else spmExcel(); return; } const b = e.target.closest && e.target.closest('.sp-open'); if(b){ e.preventDefault(); spmOpen(b.dataset.tl!==undefined?'tl':'sp', b.dataset.tl!==undefined?b.dataset.tl:b.dataset.sp); } });
 // ---- Export PDF: Detail Sales Person by Zona (untuk dibagikan, mis. ke WhatsApp) — PDF dibuat langsung di browser, tanpa pustaka luar ----
 function buildTablePdf(opt){ // opt: {title, subtitle, head:[..], body:[[..]], alignRightFrom, footer}
   const W = 1190.55, H = 841.89, M = 22, enc = s => String(s==null?'':s).replace(/[‐-―]/g,'-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[^\x20-\x7E\xA0-\xFF]/g,'').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
@@ -1992,7 +2009,7 @@ function salesMeta(rows, files){
 function computeFactsFromRows(rows){
   const itemDayFact = new Map();
   const salesFact = new Map(), brandFact = new Map(), itemFact = new Map(),
-        spFact = new Map(), sourceFact = new Map(), sourceDailyFact = new Map(), notaFact = new Map(), notaCatFact = new Map(), hourFact = new Map(), brandDayFact = new Map(), sourceZonaFact = new Map();
+        spFact = new Map(), sourceFact = new Map(), sourceDailyFact = new Map(), notaFact = new Map(), notaCatFact = new Map(), spCatFact = new Map(), hourFact = new Map(), brandDayFact = new Map(), sourceZonaFact = new Map();
   const memberTx = [];
   const itemMeta = {};
   const touchedYM = new Set();
@@ -2067,6 +2084,7 @@ function computeFactsFromRows(rows){
     const k7 = key(r.y,r.m,r.d,r.nota,r.cat);
     if(!notaCatFact.has(k7)) notaCatFact.set(k7, {y:r.y,m:r.m,d:r.d,nota:r.nota,cat:r.cat,amt:0});
     notaCatFact.get(k7).amt += r.amt;
+    if(r.spId){ const k8 = key(r.y,r.m,r.d,r.spId,r.cat); if(!spCatFact.has(k8)) spCatFact.set(k8, {y:r.y,m:r.m,d:r.d,spId:r.spId,cat:r.cat,amt:0}); spCatFact.get(k8).amt += r.amt; }
   });
 
   const sourceFactArr = [...sourceFact.values()].map(s => ({y:s.y,m:s.m,source:s.source,amt:s.amt,invoice:s.notas.size}));
@@ -2084,6 +2102,7 @@ function computeFactsFromRows(rows){
     hourFact: [...hourFact.values()], brandDayFact: [...brandDayFact.values()], sourceZonaFact: [...sourceZonaFact.values()],
     notaFact: [...notaFact.values()],
     notaCatFact: [...notaCatFact.values()],
+    spCatFact: [...spCatFact.values()],
   };
 }
 
@@ -2103,6 +2122,7 @@ function mergeSalesFacts(computed){
   STATE.brandDayFact = (STATE.brandDayFact||[]).filter(r=>!touched.has(ymKey(r))).concat(computed.brandDayFact);
   STATE.notaFact = STATE.notaFact.filter(r=>!touched.has(ymKey(r))).concat(computed.notaFact);
   STATE.notaCatFact = STATE.notaCatFact.filter(r=>!touched.has(ymKey(r))).concat(computed.notaCatFact);
+  STATE.spCatFact = (STATE.spCatFact||[]).filter(r=>!touched.has(ymKey(r))).concat(computed.spCatFact);
   Object.assign(STATE.itemMeta, computed.itemMeta);
   if(computed.memberTx && computed.memberTx.length){ // ganti hanya bulan yang memang membawa data member
     const tm = new Set(); computed.memberTx.forEach(a=>tm.add(((a[0]/10000)|0)+'-'+(((a[0]/100)|0)%100)));
@@ -3996,7 +4016,7 @@ RENDERERS.upload = function(container){
     } catch(err){ log(err.message, true); }
   });
   document.getElementById('upclear-sales').addEventListener('click', ()=>{
-    STATE.salesFact=[]; STATE.brandFact=[]; STATE.itemFact=[]; STATE.itemDayFact=[]; STATE.itemMeta={}; STATE.spFact=[]; STATE.sourceFact=[]; STATE.sourceDailyFact=[]; STATE.hourFact=[]; STATE.brandDayFact=[]; STATE.sourceZonaFact=[]; STATE.notaFact=[]; STATE.notaCatFact=[]; STATE.memberTx=[];
+    STATE.salesFact=[]; STATE.brandFact=[]; STATE.itemFact=[]; STATE.itemDayFact=[]; STATE.itemMeta={}; STATE.spFact=[]; STATE.sourceFact=[]; STATE.sourceDailyFact=[]; STATE.hourFact=[]; STATE.brandDayFact=[]; STATE.sourceZonaFact=[]; STATE.notaFact=[]; STATE.notaCatFact=[]; STATE.spCatFact=[]; STATE.memberTx=[];
     STATE.uploadStatus.sales='empty'; refreshStatus('sales'); log('Data sales dikosongkan.'); rendered_reset();
   });
 
@@ -5452,6 +5472,7 @@ RENDERERS.salesperson = function(container){
     const dateFiltered = period==='mtd' && (spDateFrom>1 || spDateTo<dim);
     const dayFilter = period==='mtd' ? { from: Math.min(spDateFrom,spDateTo), to: Math.max(spDateFrom,spDateTo) } : null;
     const data = querySalesperson(curYms, lyYms, filters, dayFilter);
+    window.__spCtx = { curYms, lyYms, dayFilter, label: (PERIOD_LABELS[period]||period) + ' ' + curYear + ' · ' + (selMonths.length>1 ? MONTH_NAMES[Math.min(...selMonths)-1]+'–'+MONTH_NAMES[Math.max(...selMonths)-1] : MONTH_NAMES[selMonths[0]-1]) + (dayFilter ? ' (Tgl '+String(dayFilter.from).padStart(2,'0')+'–'+String(dayFilter.to).padStart(2,'0')+')' : '') };
     const top15 = data.personTotal.slice(0,15);
 
     // Top 3 by month (Jan..latest bulan tersedia) + Top 3 YTD — respects Zona/Kriteria filter, independent of Periode toggle
@@ -5547,7 +5568,7 @@ RENDERERS.salesperson = function(container){
         <tr>
           <td class="num">${r.rankStore<99999?'#'+r.rankStore:'-'}</td><td class="num">${r.rankZona<99999?'#'+r.rankZona:'-'}</td>
           <td title="${r.spId}">${r.spId}</td><td title="${r.spName}"><button type="button" class="cu-link sp-open" style="text-align:left" data-sp="${r.spId}" title="Klik untuk rincian per bulan">${shortWords(r.spName)}</button></td>
-          <td><span class="zona-tag"><span class="zona-dot" style="background:${ZONA_COLOR[r.zona]||'#999'}"></span>${r.zona}</span></td>
+          <td><button type="button" class="cu-link sp-zona-open" style="text-align:left" data-zona="${r.zona}" data-sp="${r.spId}" title="Klik: penjualan ${r.zona} per kategori"><span class="zona-tag"><span class="zona-dot" style="background:${ZONA_COLOR[r.zona]||'#999'}"></span>${r.zona}</span></button></td>
           <td title="${r.kriteria||'-'}">${abbrKriteria(r.kriteria||'-')}</td>
           <td title="${r.masterBrand||'-'}">${shortWords(r.masterBrand||'-')}</td><td title="${r.tl||'-'}">${shortWords(r.tl||'-')}</td>
           <td class="num">${r.budget?fmtRp(r.budget,{noPrefix:true}):'-'}</td>
