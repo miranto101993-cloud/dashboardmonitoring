@@ -15,3 +15,6 @@ Saat admin memilih file untuk diunggah, server memberi "kunci" ke admin itu (ber
 
 ## Belting untuk Sales Private Brand
 Login Sales dengan Master Brand "Private Brand" mendapat tab **Belting** (posisi terakhir, skor, riwayat). File belting tidak memiliki ID Salper, jadi pencocokan dilakukan lewat **nama** (singkatan/salah ketik kecil ditoleransi; nama yang ambigu tidak ditampilkan agar tidak salah orang). Setiap sales hanya melihat belting miliknya sendiri.
+
+## Sales by Brand (Private Brand)
+Untuk Salesperson Private Brand, "Sales by Brand" = penjualan Private Brand + Exclusive Brand (Master Type Brand) milik salesperson itu sendiri, hanya pada kategori di dalam zonanya sendiri (data per salesperson per kategori: `spCatFact`).

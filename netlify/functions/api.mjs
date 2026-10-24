@@ -149,7 +149,7 @@ async function effective() {
   const smTo = dm.sales && dm.sales.to ? String(dm.sales.to).slice(0, 10) : ''; if (smTo > maxD) maxD = smTo;
   const meta = { ...(seed.meta || {}), years: (seed.meta && seed.meta.years) || [2025, 2026] };
   if (maxD) { meta.latestDate2026 = maxD; meta.latestMonth2026 = +maxD.slice(5, 7); }
-  _eff = { beltingPB: (pl && Array.isArray(pl.beltingPB) && pl.beltingPB.length) ? pl.beltingPB : beltSeed(), spFact, salperFact: sp.salperFact, budgetSalperFact: sp.budgetSalperFact, tlMentor: sp.tlMentor, itemFact: pick('itemFact'), itemDayFact, budgetDailyFact: pick('budgetDailyFact'), budgetPBFact: pick('budgetPBFact'), sqvItems: sqv.sqvItems, dcByItem: dcg, itemMeta: mergePb((pl && pl.itemMeta) || seed.itemMeta || {}, seed.itemMeta || {}), meta, dataMeta: dm };
+  _eff = { spCatFact: pick('spCatFact'), beltingPB: (pl && Array.isArray(pl.beltingPB) && pl.beltingPB.length) ? pl.beltingPB : beltSeed(), spFact, salperFact: sp.salperFact, budgetSalperFact: sp.budgetSalperFact, tlMentor: sp.tlMentor, itemFact: pick('itemFact'), itemDayFact, budgetDailyFact: pick('budgetDailyFact'), budgetPBFact: pick('budgetPBFact'), sqvItems: sqv.sqvItems, dcByItem: dcg, itemMeta: mergePb((pl && pl.itemMeta) || seed.itemMeta || {}, seed.itemMeta || {}), meta, dataMeta: dm };
   _effRev = rev; _scoped.clear(); return _eff;
 }
 const ZONA_MAP = { 'FLOORING AND WALL': 'Zona 1', 'BATHROOM': 'Zona 2', 'PLUMBING': 'Zona 2', 'APPLIANCES': 'Zona 3', 'DOORS AND WINDOWS': 'Zona 3', 'ELECTRICAL AND LIGHTING': 'Zona 3', 'HARDWARE': 'Zona 3', 'HOUSEWARE & HOBBIES': 'Zona 3', 'HOBBIES': 'Zona 3', 'KITCHEN': 'Zona 3', 'TOOLS': 'Zona 3', 'MISCELLANEOUS': 'Zona 3', 'BUILDING MATERIAL': 'Zona 4', 'PAINT AND SUNDRIES': 'Zona 4' };
@@ -163,10 +163,15 @@ function mbMatcher(mb) { const ut = mbTok(mb); return (rowMb) => { for (const t 
 function scopedFor(eff, spId) {
   const id = normId(spId);
   const row = eff.salperFact.find((r) => normId(r.spId) === id);
-  const sp = eff.spFact.filter((r) => normId(r.spId) === id);
+  let sp = eff.spFact.filter((r) => normId(r.spId) === id);
   const tl = (eff.tlMentor.find((r) => normId(r.spId) === id) || {}).tl || '';
   const mb = row ? String(row.masterBrand || '').trim() : '', zona = row ? row.zona : '';
   const isPB = mb.toLowerCase() === 'private brand', noBrand = NO_BRAND.has(mb.toLowerCase()) && !isPB;
+  // Private Brand: penjualan Private + Exclusive Brand milik salesperson ini, hanya pada kategori di dalam zonanya sendiri
+  if (isPB && zona && (eff.spCatFact || []).some((r) => r.pbAmt !== undefined)) {
+    const pz = new Map(); for (const r of eff.spCatFact) { if (normId(r.spId) !== id || zonaOf(r.cat, r.m) !== zona) continue; const k = r.y + '|' + r.m + '|' + (r.d || 0); pz.set(k, (pz.get(k) || 0) + (r.pbAmt || 0)); }
+    sp = sp.map((r) => ({ ...r, pbAmt: pz.get(r.y + '|' + r.m + '|' + (r.d || 0)) || 0 }));
+  }
   const latestM = eff.meta.latestMonth2026 || 12;
   const itemMeta = {}; let brandMode = 'none';
   const put = (id2, v) => { if (!itemMeta[id2]) itemMeta[id2] = { name: v.name || v.itemName || id2, cat: v.cat || '', subcat: v.subcat || '', func: v.func || '', brand: v.brand || '', mb: v.masterBrand || '' }; };

@@ -609,7 +609,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         + card('Growth', lyA ? gHtml(g) : '–', 'vs ' + ly)
         + card('Diff Budget', bud == null ? '–' : dClr(amt - bud, fD(amt - bud)), 'Actual − Budget')
         + card('Diff Growth', lyA ? dClr(amt - lyA, fD(amt - lyA)) : '–', 'Actual − Sales LY')
-        + (hasBrand ? card('Sales by Brand', fRp(pool), esc(brandLbl) + ' · seluruh toko' + (poolL ? '<br>LY: ' + fRp(poolL) + ' ' + gHtml(growth(pool, poolL)) : '') + '<br>Penjualan Anda: <b>' + fRp(own) + '</b>') : '')
+        + (hasBrand && isPB ? card('Sales by Brand', fRp(own), 'Private + Exclusive Brand · ' + esc(U.zona || 'zona Anda') + ' (penjualan Anda)' + (l.pbAmt ? '<br>LY: ' + fRp(l.pbAmt) + ' ' + gHtml(growth(own, l.pbAmt)) : '')) : hasBrand ? card('Sales by Brand', fRp(pool), esc(brandLbl) + ' · seluruh toko' + (poolL ? '<br>LY: ' + fRp(poolL) + ' ' + gHtml(growth(pool, poolL)) : '') + '<br>Penjualan Anda: <b>' + fRp(own) + '</b>') : '')
         + card('Sales Protection', fRp(c.protectionAmt), 'Qty: <b>' + fN(c.protectionQty) + '</b>' + (l.protectionQty ? ' · LY qty ' + fN(l.protectionQty) : ''))
         + card('Sales Project', fRp(c.projectAmt), 'Invoice: <b>' + (hasInv ? fN(c.projInv) : '–') + '</b>' + (l.projectAmt ? '<br>LY: ' + fRp(l.projectAmt) : ''))
         + card('Sales WhatsApp', fRp(c.whatsappAmt), 'Invoice: <b>' + (hasInv ? fN(c.waInv) : '–') + '</b>' + (l.whatsappAmt ? '<br>LY: ' + fRp(l.whatsappAmt) : ''))
@@ -632,7 +632,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
             + '<td>' + (ip == null ? '–' : ip.toLocaleString('id-ID', {maximumFractionDigits:1})) + '</td><td>' + (ipx == null ? '–' : ipx.toLocaleString('id-ID', {maximumFractionDigits:2})) + '</td><td>' + (cc.inv ? fRp(cc.amt / cc.inv) : '–') + '</td></tr>'; };
         var rows = P.parts.map(function(p){ return row(MN[p.m-1], {parts:[p]}, false); }).join('');
         h += '<div class="sx-panel"><div class="sx-ph">Rincian per Bulan</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Bulan</th><th>Actual</th><th>Budget</th><th>Achieve</th><th>' + ly + '</th><th>Growth</th><th>Invoice</th><th>Sales by Brand</th><th>Protection</th><th>Project</th><th>WhatsApp</th><th>IPD</th><th>IPI</th><th>Basket</th></tr></thead><tbody>' + rows + row('Total', P, true) + '</tbody></table></div>'
-          + '<div class="sx-note">Sales by Brand = penjualan ' + (hasBrand ? (isPB ? 'Private + Exclusive Brand zona Anda' : 'master brand ' + esc(U.mb || '')) + ' di seluruh toko' : '–') + '. Budget = Budget Salesperson zona.</div></div>';
+          + '<div class="sx-note">Sales by Brand = penjualan ' + (hasBrand ? (isPB ? 'Private + Exclusive Brand Anda pada kategori zona Anda' : 'master brand ' + esc(U.mb || '')) + (isPB ? '' : ' di seluruh toko') : '–') + '. Budget = Budget Salesperson zona.</div></div>';
       } else {
         var m0 = P.parts[0].m, a = S.per === 'month' && S.week ? P.parts[0] : {d1:1, d2:maxDayOf(m0)}, trs = '';
         for(var d = a.d1; d <= a.d2; d++){ var cc = sumCur(spC, {parts:[{m:m0, d1:d, d2:d}]}, SPF); if(!cc.amt && !cc.inv) continue; trs = '<tr' + (S.per === 'date' && d === +S.date.slice(8, 10) ? ' class="tot"' : '') + '><td>' + d + ' ' + MS[m0-1] + '</td><td>' + fRp(cc.amt) + '</td><td>' + fN(cc.inv) + '</td><td>' + (cc.inv ? fRp(cc.amt / cc.inv) : '–') + '</td><td>' + fRp(isPB ? cc.pbAmt : cc.brandAmt) + '</td></tr>' + trs; }
@@ -2084,7 +2084,7 @@ function computeFactsFromRows(rows){
     const k7 = key(r.y,r.m,r.d,r.nota,r.cat);
     if(!notaCatFact.has(k7)) notaCatFact.set(k7, {y:r.y,m:r.m,d:r.d,nota:r.nota,cat:r.cat,amt:0});
     notaCatFact.get(k7).amt += r.amt;
-    if(r.spId){ const k8 = key(r.y,r.m,r.d,r.spId,r.cat); if(!spCatFact.has(k8)) spCatFact.set(k8, {y:r.y,m:r.m,d:r.d,spId:r.spId,cat:r.cat,amt:0}); spCatFact.get(k8).amt += r.amt; }
+    if(r.spId){ const k8 = key(r.y,r.m,r.d,r.spId,r.cat); if(!spCatFact.has(k8)) spCatFact.set(k8, {y:r.y,m:r.m,d:r.d,spId:r.spId,cat:r.cat,amt:0,pbAmt:0}); const sc8 = spCatFact.get(k8); sc8.amt += r.amt; if(r.isPB) sc8.pbAmt += r.amt; }
   });
 
   const sourceFactArr = [...sourceFact.values()].map(s => ({y:s.y,m:s.m,source:s.source,amt:s.amt,invoice:s.notas.size}));
@@ -3038,7 +3038,9 @@ function querySalesperson(curYms, lyYms, filters, dayFilter){
   const lySet = new Set(lyYms.map(x=>x.y+'-'+x.m));
   const inDayRange = r => !dayFilter || (r.d>=dayFilter.from && r.d<=dayFilter.to);
   // Data LY lama (2025) tersimpan per bulan tanpa tanggal: bulan penuh → dipakai utuh; rentang tanggal parsial → dihitung proporsional jumlah hari.
-  const lyW = r => { if(r.d!==undefined) return inDayRange(r) ? 1 : 0; if(!dayFilter) return 1; const dim = daysInMonth(r.y,r.m), lo = Math.max(1,dayFilter.from), hi = Math.min(dim,dayFilter.to); return hi>=lo ? (hi-lo+1)/dim : 0; };
+  // rentang hari efektif tiap bulan: filter tanggal (bila ada) dibatasi sampai tanggal data terakhir pada bulan berjalan → TY, LY dan budget apple to apple
+  const rngOf = (y,m)=>{ const dim = daysInMonth(y,m), cut = Math.min(dim, effectiveCutoffDay(y,m)); return {lo: dayFilter ? Math.max(1,dayFilter.from) : 1, hi: Math.min(cut, dayFilter ? dayFilter.to : dim), dim}; };
+  const lyW = r => { const g = rngOf(r.y,r.m); if(r.d!==undefined) return (r.d>=g.lo && r.d<=g.hi) ? 1 : 0; return g.hi>=g.lo ? (g.hi-g.lo+1)/g.dim : 0; };
   const actM = new Map(); // bulan aktif tiap salesperson (membuat sales; bila filter tanggal, hanya sales di dalam rentang tanggal) → dasar budget proporsional
 
   const cur = new Map(), ly = new Map();
@@ -3046,20 +3048,25 @@ function querySalesperson(curYms, lyYms, filters, dayFilter){
     const ymk = r.y+'-'+r.m;
     if(curSet.has(ymk) && inDayRange(r) && (r.amt!==0 || (r.inv||0)>0)){ let st = actM.get(r.spId); if(!st){ st = new Set(); actM.set(r.spId, st); } st.add(ymk); }
     if(curSet.has(ymk) && inDayRange(r)){
-      if(!cur.has(r.spId)) cur.set(r.spId, {amt:0,pbAmt:0,protectionQty:0,projectAmt:0,whatsappAmt:0,spName:cleanName(r.spName),rows:0,rowsInv:0,inv:0,qty:0,items:0,days:0});
+      if(!cur.has(r.spId)) cur.set(r.spId, {amt:0,pbAmt:0,brandAmt:0,protectionQty:0,projectAmt:0,whatsappAmt:0,spName:cleanName(r.spName),rows:0,rowsInv:0,inv:0,qty:0,items:0,days:0});
       const s = cur.get(r.spId);
       s.rows++; if(r.inv!==undefined && r.items!==undefined){ s.rowsInv++; s.inv+=r.inv; s.items+=r.items; s.qty+=(r.qty||0); if(r.inv>0) s.days++; }
-      s.amt+=r.amt; s.pbAmt+=r.pbAmt; s.protectionQty+=(r.protectionQty||0); s.projectAmt+=(r.projectAmt||0); s.whatsappAmt+=(r.whatsappAmt||0);
+      s.amt+=r.amt; s.pbAmt+=r.pbAmt; s.brandAmt+=(r.brandAmt||0); s.protectionQty+=(r.protectionQty||0); s.projectAmt+=(r.projectAmt||0); s.whatsappAmt+=(r.whatsappAmt||0);
       if(r.spName) s.spName = r.spName;
     }
     const wLY = lySet.has(ymk) ? lyW(r) : 0;
     if(wLY>0){
-      if(!ly.has(r.spId)) ly.set(r.spId, {amt:0,rows:0,rowsInv:0,inv:0,qty:0,items:0,days:0});
-      const sl = ly.get(r.spId); sl.amt += r.amt*wLY;
+      if(!ly.has(r.spId)) ly.set(r.spId, {amt:0,pbAmt:0,brandAmt:0,rows:0,rowsInv:0,inv:0,qty:0,items:0,days:0});
+      const sl = ly.get(r.spId); sl.amt += r.amt*wLY; sl.pbAmt += (r.pbAmt||0)*wLY; sl.brandAmt += (r.brandAmt||0)*wLY;
       sl.rows++; if(r.inv!==undefined && r.items!==undefined){ sl.rowsInv++; sl.inv+=r.inv; sl.items+=r.items; sl.qty+=(r.qty||0); if(r.inv>0) sl.days++; }
     }
   });
 
+  // Sales By Brand kriteria Private Brand = penjualan Private Brand + Exclusive Brand (Master Type Brand) milik salesperson itu sendiri, hanya pada kategori di dalam zonanya sendiri
+  const pbOwn = new Map(), pbOwnLY = new Map(); let pbCatOK = false;
+  (STATE.spCatFact||[]).forEach(r=>{ if(r.pbAmt===undefined) return; pbCatOK = true; const ymk = r.y+'-'+r.m, z = catToZona(r.cat, r.m), k = r.spId+'|'+z;
+    if(curSet.has(ymk) && inDayRange(r)) pbOwn.set(k, (pbOwn.get(k)||0)+r.pbAmt);
+    if(lySet.has(ymk)){ const w = lyW(r); if(w>0) pbOwnLY.set(k, (pbOwnLY.get(k)||0)+r.pbAmt*w); } });
   // Zona-level Private Brand + Exclusive Brand pool (shared team KPI for Kriteria "Private Brand")
   const pbPoolByZona = new Map(), pbPoolByZonaLY = new Map();
   STATE.salesFact.forEach(r=>{
@@ -3086,18 +3093,15 @@ function querySalesperson(curYms, lyYms, filters, dayFilter){
     let budget = 0;
     if(SALPER_BUDGET_ZONAS.includes(info.zona) && (info.kriteria==='Private Brand' || info.kriteria==='Supplier')){
       const act = actM.get(spId); // budget hanya untuk bulan saat salesperson membuat sales (proporsional)
-      curYms.forEach(({y,m})=>{ if(act && act.has(y+'-'+m)){
-        if(dayFilter){ // filter tanggal: budget sebulan ÷ jumlah hari bulan × jumlah hari pada rentang tanggal
-          const row = STATE.budgetSalperFact.find(r=>r.zona===info.zona && r.m===m), dm = daysInMonth(y,m), n = Math.max(0, Math.min(dm, dayFilter.to) - Math.max(1, dayFilter.from) + 1);
-          budget += row ? row.value * n / dm : 0;
-        } else budget += budgetForZonaMonth(info.zona, y, m); } });
+      curYms.forEach(({y,m})=>{ if(act && act.has(y+'-'+m)){ // budget sebulan ÷ jumlah hari bulan × jumlah hari berjalan (dalam rentang tanggal / s.d. tanggal data terakhir)
+        const row = STATE.budgetSalperFact.find(r=>r.zona===info.zona && r.m===m), g = rngOf(y,m), n = Math.max(0, g.hi-g.lo+1);
+        budget += row ? row.value * n / g.dim : 0; } });
     }
 
     const mbKey = String(info.masterBrand||'').trim().toUpperCase();
-    const salesByBrand = info.kriteria==='Private Brand' ? (pbPoolByZona.get(info.zona)||0)
-      : info.kriteria==='Supplier' ? (brandPool.get(mbKey)||0) : 0;
-    const salesByBrandLY = info.kriteria==='Private Brand' ? (pbPoolByZonaLY.get(info.zona)||0)
-      : info.kriteria==='Supplier' ? (brandPoolLY.get(mbKey)||0) : 0;
+    // Sales By Brand = penjualan brand milik salesperson itu sendiri (dihasilkan oleh salesperson tersebut), bukan total brand/zona
+    const salesByBrand = info.kriteria==='Private Brand' ? (pbCatOK ? (pbOwn.get(spId+'|'+info.zona)||0) : (c.pbAmt||0)) : info.kriteria==='Supplier' ? (c.brandAmt||0) : 0;
+    const salesByBrandLY = info.kriteria==='Private Brand' ? (pbCatOK ? (pbOwnLY.get(spId+'|'+info.zona)||0) : (l.pbAmt||0)) : info.kriteria==='Supplier' ? (l.brandAmt||0) : 0;
 
     return {
       spId, spName: info.spName, zona: info.zona, kriteria: info.kriteria, masterBrand: info.masterBrand, tl: tlOf(spId),
