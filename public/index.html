@@ -1061,11 +1061,14 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
     function show(){ if(banner) return; banner = document.createElement('div'); banner.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:99990;background:#17262E;color:#fff;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:13.5px;';
       banner.innerHTML = '<span>Data dashboard sudah diperbarui.</span><button style="border:0;border-radius:8px;background:#D9720B;color:#241500;font-weight:800;padding:8px 14px;cursor:pointer;">Muat ulang</button>'; banner.querySelector('button').onclick = function(){ location.reload(); }; document.body.appendChild(banner); }
     var reloading = false;
-    async function poll(){ if(document.hidden || reloading) return; try{ var r = await api('rev'); var j = await r.json(); if(j.rev && j.rev !== window.__REV){
+    // Hemat kuota hosting: cek data baru tiap 5 menit (bukan 20 detik), hanya saat tab terlihat & pengguna aktif; pemicu fokus/online dibatasi minimal 60 detik.
+    var lastAct = Date.now(), lastPoll = 0;
+    ['pointerdown','keydown','scroll','touchstart'].forEach(function(ev){ document.addEventListener(ev, function(){ lastAct = Date.now(); }, {passive: true, capture: true}); });
+    async function poll(force){ if(document.hidden || reloading) return; var now = Date.now(); if(force !== true && (now - lastAct > 30 * 60e3 || now - lastPoll < 60e3)) return; lastPoll = now; try{ var r = await api('rev'); var j = await r.json(); if(j.rev && j.rev !== window.__REV){
         if(ROLE === 'admin') show();
         else { reloading = true; var t = document.createElement('div'); t.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:99990;background:#17262E;color:#fff;border-radius:12px;padding:12px 14px;font-size:13.5px;text-align:center;'; t.textContent = 'Data baru dari admin — memperbarui…'; document.body.appendChild(t); setTimeout(function(){ location.reload(); }, 1200); }
       } }catch(e){} }
-    setInterval(poll, 20000); document.addEventListener('visibilitychange', poll); window.addEventListener('focus', poll); window.addEventListener('online', poll);
+    setInterval(poll, 300000); document.addEventListener('visibilitychange', function(){ poll(); }); window.addEventListener('focus', function(){ poll(); }); window.addEventListener('online', function(){ poll(); });
     window.__siteCheck = async function(){ var r = await (await api('rev')).json(); var meta = null; try{ meta = JSON.parse(await gunz(await (await api('store/retailpulse_v2_meta')).text())); }catch(e){} return {revDiMuat: window.__REV, revServer: r.rev, tersimpanDiServer: meta ? meta.savedAt : null, bagian: meta ? meta.n : null, role: ROLE}; };
   }
 })();

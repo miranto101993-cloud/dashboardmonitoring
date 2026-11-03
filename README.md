@@ -29,3 +29,7 @@ Untuk Salesperson Private Brand, "Sales by Brand" = penjualan Private Brand + Ex
 - Admin utama bisa memberi izin lewat **Kelola Pengguna → Beri izin upload** pada user Manager: sistem membuat kode (atau Anda isi sendiri, min. 6 karakter) yang harus diberikan ke admin tersebut.
 - Admin yang diberi izin melihat menu Upload Data, tetapi harus memasukkan kode setiap sesi (berlaku 8 jam). **Cabut izin upload** / **Ganti kode** langsung mematikan akses yang sudah terbuka.
 - Riwayat Upload hanya terlihat oleh admin yang berwenang unggah.
+
+## Hemat kuota Netlify (Nov 2026)
+- Cek data baru kini tiap 5 menit (dulu 20 detik), hanya saat tab terlihat dan pengguna aktif (≤30 menit sejak aktivitas terakhir).
+- Setiap push ke GitHub = 1 deploy produksi = 15 kredit. Kumpulkan perubahan, atau matikan auto-publish di Netlify (Site configuration → Build & deploy → Continuous deployment → Stop auto publishing) dan publish manual hanya bila perlu.
