@@ -112,6 +112,10 @@ h1,h2,h3,h4{
 .topbar h2{ font-size: 20px; }
 .topbar .period{ font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
 .topbar-right{ display:flex; gap:10px; align-items:center; }
+.data-fresh{ display:inline-flex; align-items:center; gap:6px; margin-top:3px; font-size:11.5px; font-weight:600; padding:2px 9px; border-radius:999px; background:#E7F3EC; color:#1F6B3F; }
+.data-fresh.warn{ background:#FFF1D6; color:#8A5A00; }
+.data-fresh.old{ background:#FBE3E0; color:var(--bad); }
+.data-fresh::before{ content:""; width:7px; height:7px; border-radius:50%; background:currentColor; }
 .badge{
   font-size:11.5px; padding:5px 10px; border-radius:100px; font-weight:600;
   background: var(--amber-soft); color:#8A4A05; border:1px solid #EFCFA1;
@@ -396,7 +400,7 @@ table thead th [style*="color"], table thead th .hint{ color:inherit; }
 th[data-arrow]::after{ color:#FFC773 !important; }
 </style>
 <style>/* Mode website: pengguna Viewer tidak melihat menu Upload */
-body.role-viewer #nav-upload{ display:none !important; }
+body.role-viewer #nav-upload, body.no-upload #nav-upload{ display:none !important; }
 body.role-viewer #nav-customer{ display:none !important; }
 body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{ display:none !important; }
 </style>
@@ -609,7 +613,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         + card('Growth', lyA ? gHtml(g) : '–', 'vs ' + ly)
         + card('Diff Budget', bud == null ? '–' : dClr(amt - bud, fD(amt - bud)), 'Actual − Budget')
         + card('Diff Growth', lyA ? dClr(amt - lyA, fD(amt - lyA)) : '–', 'Actual − Sales LY')
-        + (hasBrand && isPB ? card('Sales by Brand', fRp(own), 'Private + Exclusive Brand · ' + esc(U.zona || 'zona Anda') + ' (penjualan Anda)' + (l.pbAmt ? '<br>LY: ' + fRp(l.pbAmt) + ' ' + gHtml(growth(own, l.pbAmt)) : '')) : hasBrand ? card('Sales by Brand', fRp(pool), esc(brandLbl) + ' · seluruh toko' + (poolL ? '<br>LY: ' + fRp(poolL) + ' ' + gHtml(growth(pool, poolL)) : '') + '<br>Penjualan Anda: <b>' + fRp(own) + '</b>') : '')
+        + (hasBrand && isPB ? card('Sales by Brand', fRp(own), 'Private + Exclusive Brand · ' + esc(U.zona || 'zona Anda') + ' (penjualan Anda)' + (l.pbAmt ? '<br>LY: ' + fRp(l.pbAmt) + ' ' + gHtml(growth(own, l.pbAmt)) : '')) : hasBrand ? card('Sales by Brand', fRp(own), esc(brandLbl) + ' · penjualan Anda' + (l.brandAmt ? '<br>LY: ' + fRp(l.brandAmt) + ' ' + gHtml(growth(own, l.brandAmt)) : '')) : '')
         + card('Sales Protection', fRp(c.protectionAmt), 'Qty: <b>' + fN(c.protectionQty) + '</b>' + (l.protectionQty ? ' · LY qty ' + fN(l.protectionQty) : ''))
         + card('Sales Project', fRp(c.projectAmt), 'Invoice: <b>' + (hasInv ? fN(c.projInv) : '–') + '</b>' + (l.projectAmt ? '<br>LY: ' + fRp(l.projectAmt) : ''))
         + card('Sales WhatsApp', fRp(c.whatsappAmt), 'Invoice: <b>' + (hasInv ? fN(c.waInv) : '–') + '</b>' + (l.whatsappAmt ? '<br>LY: ' + fRp(l.whatsappAmt) : ''))
@@ -632,7 +636,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
             + '<td>' + (ip == null ? '–' : ip.toLocaleString('id-ID', {maximumFractionDigits:1})) + '</td><td>' + (ipx == null ? '–' : ipx.toLocaleString('id-ID', {maximumFractionDigits:2})) + '</td><td>' + (cc.inv ? fRp(cc.amt / cc.inv) : '–') + '</td></tr>'; };
         var rows = P.parts.map(function(p){ return row(MN[p.m-1], {parts:[p]}, false); }).join('');
         h += '<div class="sx-panel"><div class="sx-ph">Rincian per Bulan</div><div class="sx-tw"><table class="sx-t"><thead><tr><th>Bulan</th><th>Actual</th><th>Budget</th><th>Achieve</th><th>' + ly + '</th><th>Growth</th><th>Invoice</th><th>Sales by Brand</th><th>Protection</th><th>Project</th><th>WhatsApp</th><th>IPD</th><th>IPI</th><th>Basket</th></tr></thead><tbody>' + rows + row('Total', P, true) + '</tbody></table></div>'
-          + '<div class="sx-note">Sales by Brand = penjualan ' + (hasBrand ? (isPB ? 'Private + Exclusive Brand Anda pada kategori zona Anda' : 'master brand ' + esc(U.mb || '')) + (isPB ? '' : ' di seluruh toko') : '–') + '. Budget = Budget Salesperson zona.</div></div>';
+          + '<div class="sx-note">Sales by Brand = penjualan ' + (hasBrand ? (isPB ? 'Private + Exclusive Brand Anda pada kategori zona Anda' : 'master brand ' + esc(U.mb || '') + ' yang Anda jual sendiri') : '–') + '. Budget = Budget Salesperson zona.</div></div>';
       } else {
         var m0 = P.parts[0].m, a = S.per === 'month' && S.week ? P.parts[0] : {d1:1, d2:maxDayOf(m0)}, trs = '';
         for(var d = a.d1; d <= a.d2; d++){ var cc = sumCur(spC, {parts:[{m:m0, d1:d, d2:d}]}, SPF); if(!cc.amt && !cc.inv) continue; trs = '<tr' + (S.per === 'date' && d === +S.date.slice(8, 10) ? ' class="tot"' : '') + '><td>' + d + ' ' + MS[m0-1] + '</td><td>' + fRp(cc.amt) + '</td><td>' + fN(cc.inv) + '</td><td>' + (cc.inv ? fRp(cc.amt / cc.inv) : '–') + '</td><td>' + fRp(isPB ? cc.pbAmt : cc.brandAmt) + '</td></tr>' + trs; }
@@ -793,8 +797,10 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
   window.__REV = '0';
   function tok(){ try{ return localStorage.getItem(TOKEN_KEY) || ''; }catch(e){ return ''; } }
   function setTok(t){ try{ if(t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); }catch(e){} }
+  function upTok(){ try{ return sessionStorage.getItem('m10_up') || ''; }catch(e){ return ''; } }
+  function setUpTok(t){ try{ if(t) sessionStorage.setItem('m10_up', t); else sessionStorage.removeItem('m10_up'); }catch(e){} }
   async function api(path, opts){
-    opts = opts || {}; var h = Object.assign({}, opts.headers || {}); var t = tok(); if(t) h.Authorization = 'Bearer ' + t;
+    opts = opts || {}; var h = Object.assign({}, opts.headers || {}); var t = tok(); if(t) h.Authorization = 'Bearer ' + t; var ut = upTok(); if(ut) h['x-upload-token'] = ut;
     var r = await fetch('/api/' + path, Object.assign({cache: /[?&]v=/.test(path) ? 'default' : 'no-store'}, opts, {headers: h}));
     if(r.status === 401 && path !== 'login'){ setTok(''); if(!window.__reloading401){ window.__reloading401 = true; location.reload(); } throw new Error('Sesi berakhir — silakan login ulang.'); }
     return r;
@@ -863,7 +869,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       if(isMeta){
         var info = JSON.parse(value); info.sid = SID || info.sid; var prev = LAST_META; value = JSON.stringify(info);
         body = await gz(value);
-        var r = await api('store/' + encodeURIComponent(k), {method:'PUT', body: body, headers:{'x-base-rev': window.__REV}}); if(!r.ok){ var ej = await r.json().catch(function(){ return {}; }); if(ej.stale || ej.locked) blockModal(ej.error, !!ej.stale); throw new Error(ej.error || ('Gagal menyimpan ke server (HTTP ' + r.status + ')')); }
+        var r = await api('store/' + encodeURIComponent(k), {method:'PUT', body: body, headers:{'x-base-rev': window.__REV, 'x-note': encodeURIComponent(window.__uploadNote || '')}}); if(!r.ok){ var ej = await r.json().catch(function(){ return {}; }); if(ej.stale || ej.locked) blockModal(ej.error, !!ej.stale); throw new Error(ej.error || ('Gagal menyimpan ke server (HTTP ' + r.status + ')')); }
         var j = await r.json(); if(j.rev) window.__REV = j.rev;
         LAST_META = info; META_VER = info.savedAt || '';
         if(prev && prev.sid && prev.sid !== info.sid){ for(var i=0;i<(prev.n||0);i++) api('store/' + encodeURIComponent('v' + prev.sid + ':chunk:' + i), {method:'DELETE'}).catch(function(){}); } // bersihkan versi lama
@@ -883,6 +889,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
     async list(){ return {keys: []}; }
   };
 
+  window.__history = async function(){ var r = await api('history'); if(!r.ok) throw new Error('HTTP ' + r.status); return (await r.json()).history || []; };
   // ---------- kunci unggah & perlindungan data terbaru ----------
   function blockModal(msg, stale){
     var old = document.getElementById('site-block'); if(old) return;
@@ -892,13 +899,14 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
   }
   window.__uploadBegin = async function(){
     if(ROLE !== 'admin') return;
+    if(!window.__UPLOAD_OK) throw new Error('NO_UPLOAD');
     var r = await api('lock', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({action:'acquire', rev: window.__REV})}), j = await r.json().catch(function(){ return {}; });
     if(!r.ok || !j.ok){ blockModal(j.error || 'Tidak bisa mengambil kunci unggah.', !!j.stale); throw new Error(j.error || 'LOCK'); }
   };
   window.__uploadEnd = function(){ if(ROLE === 'admin') api('lock', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({action:'release'})}).catch(function(){}); };
   // Gerbang saat admin memilih / menjatuhkan file: ambil kunci + pastikan halaman memuat data terbaru SEBELUM file diproses
   function gate(ev){
-    if(ROLE !== 'admin') return;
+    if(ROLE !== 'admin' || !window.__UPLOAD_OK) return;
     var isFile = ev.type === 'drop' ? !!(ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files.length) : (ev.target && ev.target.type === 'file'); if(!isFile) return;
     try{
       var x = new XMLHttpRequest(); x.open('POST', '/api/lock', false); x.setRequestHeader('Authorization', 'Bearer ' + tok()); x.setRequestHeader('content-type', 'application/json'); x.send(JSON.stringify({action:'acquire', rev: window.__REV}));
@@ -915,9 +923,9 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
     say('Memeriksa akses…');
     var s = await (await fetch('/api/session', {headers: tok() ? {Authorization: 'Bearer ' + tok()} : {}})).json();
     if(!s.role){ if(L) L.style.display = 'none'; await loginUI(); if(L) L.style.display = 'flex'; s = await (await fetch('/api/session', {headers: {Authorization: 'Bearer ' + tok()}})).json(); }
-    window.__USER = s.user; window.__NAME = s.name; window.__CANMANAGE = !!s.canManage;
+    window.__USER = s.user; window.__NAME = s.name; window.__CANMANAGE = !!s.canManage; window.__CANUPLOAD = !!s.canUpload; window.__UPLOAD_OK = !!s.uploadOk; if(!s.uploadOk) setUpTok('');
     ROLE = s.role; window.__REV = s.rev || '0'; window.__ROLE = ROLE;
-    document.body.classList.add('role-' + (ROLE || 'viewer'));
+    document.body.classList.add('role-' + (ROLE || 'viewer')); if(ROLE === 'admin' && !s.canUpload) document.body.classList.add('no-upload');
     if(ROLE === 'sales'){
       say('Memuat data Anda…');
       var rs = await api('scoped'); if(!rs.ok) throw new Error('Gagal memuat data Anda (HTTP ' + rs.status + ')');
@@ -969,7 +977,8 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         h += '<div data-q="' + esc((p.name + ' ' + p.username + ' ' + kl + ' permintaan').toLowerCase()) + '" style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;"><div><b>' + esc(p.name) + '</b> <span style="color:#777;">(' + U + ')</span> · <span style="font-size:12px;font-weight:700;color:#D9720B;">Minta: ' + kl + '</span><div style="font-size:11.5px;color:#888;">' + esc((p.requestedAt || '').slice(0,16).replace('T',' ')) + '</div></div><div>' + btns + '<button data-a="reject" data-u="' + U + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Tolak</button></div></div>'; });
       h += '<div style="font-weight:700;margin:14px 0 4px;">Pengguna aktif (' + data.users.length + ')</div>';
       if(!data.users.length) h += '<div style="font-size:13px;color:#777;">Belum ada pengguna selain admin utama.</div>';
-      data.users.forEach(function(u){ h += '<div data-q="' + esc((u.name + ' ' + u.username + ' ' + (u.role === 'admin' ? 'manager admin' : u.role === 'sales' ? 'sales salesperson ' + (u.mb || '') : 'team leader viewer') + (u.disabled ? ' nonaktif' : '')).toLowerCase()) + '" style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div><b>' + esc(u.name) + '</b> <span style="color:#777;">(' + esc(u.username) + ')</span> · ' + (u.role === 'admin' ? 'Manager / Admin' : u.role === 'sales' ? 'Sales · ' + esc(u.mb || '') : 'Team Leader (Viewer)') + (u.disabled ? ' · <span style="color:#B23A2E;">nonaktif</span>' : '') + '</div><div>'
+      data.users.forEach(function(u){ h += '<div data-q="' + esc((u.name + ' ' + u.username + ' ' + (u.role === 'admin' ? 'manager admin' : u.role === 'sales' ? 'sales salesperson ' + (u.mb || '') : 'team leader viewer') + (u.disabled ? ' nonaktif' : '')).toLowerCase()) + '" style="border:1px solid #e3dfd2;border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div><b>' + esc(u.name) + '</b> <span style="color:#777;">(' + esc(u.username) + ')</span> · ' + (u.role === 'admin' ? 'Manager / Admin' : u.role === 'sales' ? 'Sales · ' + esc(u.mb || '') : 'Team Leader (Viewer)') + (u.disabled ? ' · <span style="color:#B23A2E;">nonaktif</span>' : '') + (u.role === 'admin' ? (u.upload ? ' · <span style="color:#1B7F4B;font-weight:700;">izin upload aktif</span>' : ' · <span style="color:#888;">tanpa izin upload</span>') : '') + '</div><div>'
+        + (u.role === 'admin' ? '<button data-a="upl" data-e="1" data-u="' + esc(u.username) + '" style="'+BT+'background:#17262E;color:#fff;">' + (u.upload ? 'Ganti kode upload' : 'Beri izin upload') + '</button>' + (u.upload ? '<button data-a="upl" data-e="0" data-u="' + esc(u.username) + '" style="'+BT+'background:#f3d9d5;color:#7a1f14;">Cabut izin upload</button>' : '') : '')
         + (u.role === 'sales' ? '' : '<button data-a="role" data-r="' + (u.role === 'admin' ? 'viewer' : 'admin') + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Jadikan ' + (u.role === 'admin' ? 'Team Leader (bukan admin)' : 'Admin') + '</button>')
         + '<button data-a="toggle" data-d="' + (u.disabled ? 0 : 1) + '" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">' + (u.disabled ? 'Aktifkan' : 'Nonaktifkan') + '</button>'
         + '<button data-a="pw" data-u="' + esc(u.username) + '" style="'+BT+'background:#eee;">Reset password</button>'
@@ -990,7 +999,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       h += '<form id="sadd" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;"><input name="id" list="sx-ids" placeholder="Salesperson ID (mis. S80000-0000000401)" autocapitalize="characters" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><datalist id="sx-ids">' + SM.list.map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.name + ' — ' + x.mb) + '</option>'; }).join('') + '</datalist>'
         + '<input name="password" placeholder="password (kosong = acak)" style="padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;"><button type="submit" style="'+BT+'background:#D9720B;color:#241500;padding:10px;">Buat Akun Salesperson</button></form>'
         + '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;">Buat banyak sekaligus</summary><textarea id="sbulk" rows="3" placeholder="Tempel beberapa Salesperson ID (pisahkan dengan spasi / koma / baris baru)" style="width:100%;margin-top:6px;padding:9px;border:1px solid #cfcabb;border-radius:8px;font-size:16px;box-sizing:border-box;"></textarea><button data-a="bulk" style="'+BT+'background:#17262E;color:#fff;padding:9px 12px;">Buat dari daftar</button><button data-a="all" style="'+BT+'background:#eee;padding:9px 12px;">Buat untuk SEMUA yang belum punya akun (' + freeN + ')</button></details>';
-      h += '<div style="font-size:11.5px;color:#888;margin-top:10px;">Team Leader (Viewer): semua menu kecuali Data Customer &amp; Upload Data. Manager (Admin): semua menu + Upload Data + Data Customer (Kelola Pengguna hanya untuk admin utama). Sales: hanya halaman "Performa Saya" (data sendiri + master brand-nya).</div></div>';
+      h += '<div style="font-size:11.5px;color:#888;margin-top:10px;">Team Leader (Viewer): semua menu kecuali Data Customer &amp; Upload Data. Manager (Admin): semua menu + Data Customer; menu <b>Upload Data hanya untuk admin utama</b> kecuali Manager diberi izin upload + kode (tombol "Beri izin upload"). Sales: hanya halaman "Performa Saya" (data sendiri + master brand-nya).</div></div>';
 
       d.innerHTML = h;
       d.querySelector('#uc').onclick = function(){ d.remove(); };
@@ -1001,6 +1010,10 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
         else if(a === 'reject'){ if(!confirm('Tolak permintaan ' + u + '?')) return; res = await call('/' + encodeURIComponent(u) + '/reject', 'POST', {}); }
         else if(a === 'role') res = await call('/' + encodeURIComponent(u) + '/update', 'POST', {role: t.dataset.r});
         else if(a === 'toggle') res = await call('/' + encodeURIComponent(u) + '/update', 'POST', {disabled: t.dataset.d === '1'});
+        else if(a === 'upl'){
+          if(t.dataset.e === '1'){ var cd = prompt('Kode upload untuk ' + u + '\n(kosongkan = dibuatkan acak, min. 6 karakter).\nKode ini yang harus dimasukkan admin tersebut setiap kali membuka menu Upload Data:'); if(cd === null) return; res = await call('/' + encodeURIComponent(u) + '/upload', 'POST', {enable: true, code: cd}); if(res && res.uploadCode) prompt('Izin upload aktif untuk ' + u + '.\nBerikan kode ini kepada yang bersangkutan (tidak ditampilkan lagi):', res.uploadCode); }
+          else { if(!confirm('Cabut izin upload ' + u + '?')) return; res = await call('/' + encodeURIComponent(u) + '/upload', 'POST', {enable: false}); }
+        }
         else if(a === 'pw'){ var p = prompt('Password baru untuk ' + u + ' (min. 8 karakter):'); if(!p) return; res = await call('/' + encodeURIComponent(u) + '/update', 'POST', {password: p}); }
         else if(a === 'copyres'){ var tx = 'User (ID)\tNama\tMaster Brand\tPassword\n' + LASTRES.created.map(function(c){ return [c.id, c.name, c.mb, c.password].join('\t'); }).join('\n'); try{ await navigator.clipboard.writeText(tx); alert('Tersalin.'); }catch(er){ prompt('Salin manual:', tx); } return; }
         else if(a === 'csvres'){ var csv = 'user,nama,master_brand,password\n' + LASTRES.created.map(function(c){ return [c.id, '"' + c.name + '"', '"' + c.mb + '"', c.password].join(','); }).join('\n'); var bl = new Blob([csv], {type:'text/csv'}), an = document.createElement('a'); an.href = URL.createObjectURL(bl); an.download = 'akun_salesperson.csv'; document.body.appendChild(an); an.click(); an.remove(); return; }
@@ -1015,13 +1028,31 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
     draw(await load());
   }
 
+  // ---------- kode unggah (admin non-utama yang diberi izin) ----------
+  function unlockModal(){
+    var old = document.getElementById('site-unlock'); if(old) old.remove();
+    var d = document.createElement('div'); d.id = 'site-unlock'; d.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(15,25,30,.72);display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,-apple-system,sans-serif;';
+    d.innerHTML = '<form style="background:#fff;border-radius:14px;padding:22px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4);"><div style="font-weight:800;font-size:16px;color:#17262E;">Buka Upload Data</div><div style="font-size:13px;line-height:1.5;margin:8px 0 4px;color:#444;">Masukkan kode unggah yang diberikan admin utama.</div><input id="unl-code" type="password" autocomplete="off" placeholder="Kode unggah" style="'+IN+'"><div id="unl-msg" style="color:#B23A2E;font-size:12.5px;min-height:18px;margin-top:6px;"></div><div style="display:flex;gap:8px;"><button type="submit" style="flex:1;border:0;border-radius:9px;background:#D9720B;color:#241500;font-weight:800;padding:11px;cursor:pointer;">Buka</button><button type="button" id="unl-x" style="border:0;border-radius:9px;background:#eee;padding:11px 14px;cursor:pointer;">Batal</button></div></form>';
+    document.body.appendChild(d); var inp = d.querySelector('#unl-code'); inp.focus();
+    d.querySelector('#unl-x').onclick = function(){ d.remove(); };
+    d.querySelector('form').onsubmit = async function(e){ e.preventDefault(); var m = d.querySelector('#unl-msg'); m.textContent = 'Memeriksa…';
+      try{ var r = await api('upload-unlock', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({code: inp.value})}), j = await r.json().catch(function(){ return {}; });
+        if(!r.ok || !j.ok){ m.textContent = j.error || 'Kode salah.'; return; }
+        setUpTok(j.token); window.__UPLOAD_OK = true; d.remove(); var nb = document.getElementById('nav-upload'); if(nb) nb.click();
+      }catch(er){ m.textContent = 'Gagal: ' + (er.message || er); } };
+  }
+  document.addEventListener('click', function(ev){
+    var b = ev.target.closest && ev.target.closest('#nav-upload'); if(!b || ROLE !== 'admin' || window.__UPLOAD_OK || !window.__CANUPLOAD) return;
+    ev.stopImmediatePropagation(); ev.preventDefault(); unlockModal();
+  }, true);
+
   // ---------- UI situs: peran, info pengguna, banner data baru ----------
   function startSiteUi(){
     var side = document.querySelector('.sidebar'), foot = document.getElementById('sidebar-foot');
     if(side && !document.getElementById('site-user')){
       var u = document.createElement('div'); u.id = 'site-user';
       u.style.cssText = 'font-size:11.5px;color:#8c9a92;padding:8px 10px 2px;';
-      u.innerHTML = 'Masuk: <b style="color:#fff">' + (window.__NAME || window.__USER) + '</b> (' + (ROLE === 'admin' ? 'Admin' : 'Viewer') + ')<br>' + (window.__CANMANAGE ? '<a href="#" id="site-users" style="color:#F2B35E;">Kelola Pengguna</a> · ' : '') + '<a href="#" id="site-out" style="color:#F2B35E;">Keluar</a>';
+      u.innerHTML = 'Masuk: <b style="color:#fff">' + (window.__NAME || window.__USER) + '</b> (' + (ROLE === 'admin' ? (window.__CANMANAGE ? 'Admin utama' : 'Admin') : 'Viewer') + ')<br>' + (window.__CANMANAGE ? '<a href="#" id="site-users" style="color:#F2B35E;">Kelola Pengguna</a> · ' : '') + '<a href="#" id="site-out" style="color:#F2B35E;">Keluar</a>';
       if(foot && foot.parentNode) foot.parentNode.insertBefore(u, foot.nextSibling); else side.appendChild(u);
       u.querySelector('#site-out').onclick = function(e){ e.preventDefault(); setTok(''); location.reload(); };
       var ua = u.querySelector('#site-users'); if(ua) ua.onclick = function(e){ e.preventDefault(); openUsers(); };
@@ -1061,6 +1092,7 @@ body.role-sales .app, body.role-sales .nav-backdrop, body.role-sales .hamburger{
       <div>
         <h2 id="topbar-title">Overview</h2>
         <div class="period" id="topbar-period">—</div>
+        <div class="data-fresh" id="data-fresh" style="display:none"></div>
       </div>
       <div class="topbar-right">
         <span class="badge">Regional 3 &middot; Jogja</span>
@@ -1091,17 +1123,28 @@ const SEED = decodeSeed(JSON.parse(window.__SEED_TEXT)); window.__SEED_TEXT = nu
 // Seed data "Source KPI" (Achievement bulanan per indikator, dari file upload awal).
 // Bisa di-upload ulang / dilengkapi lewat halaman Upload Data → "Source KPI".
 // Kolom: Bulan, DSL, AWT, Net profit, NEMS, PickUp Money, Salah EDC, Ontime staging, Ontime receiving, Accuracy all.
-const SOURCE_KPI_SEED = [
-  {y:2026, m:1, dsl:0.97012,  awt:1.0, netProfit:null, nems:null, pickupMoney:null, salahEdc:null, ontimeStaging:null, ontimeReceiving:null, accuracyAll:null, respondTime:null},
-  {y:2026, m:2, dsl:0.968912, awt:1.0, netProfit:null, nems:null, pickupMoney:null, salahEdc:null, ontimeStaging:null, ontimeReceiving:null, accuracyAll:null, respondTime:null},
-  {y:2026, m:3, dsl:0.972656, awt:1.0, netProfit:null, nems:null, pickupMoney:null, salahEdc:null, ontimeStaging:null, ontimeReceiving:null, accuracyAll:null, respondTime:null},
-  {y:2026, m:4, dsl:0.977735, awt:1.0, netProfit:null, nems:null, pickupMoney:null, salahEdc:null, ontimeStaging:null, ontimeReceiving:null, accuracyAll:null, respondTime:null},
-  {y:2026, m:5, dsl:0.972305, awt:1.0, netProfit:null, nems:null, pickupMoney:null, salahEdc:null, ontimeStaging:null, ontimeReceiving:null, accuracyAll:null, respondTime:null},
-  {y:2026, m:6, dsl:null,     awt:1.0, netProfit:null, nems:null, pickupMoney:null, salahEdc:null, ontimeStaging:null, ontimeReceiving:null, accuracyAll:null, respondTime:null},
-  {y:2026, m:7, dsl:0.972497, awt:1.0, netProfit:null, nems:null, pickupMoney:null, salahEdc:null, ontimeStaging:null, ontimeReceiving:null, accuracyAll:null, respondTime:null},
-  {y:2026, m:8, dsl:0.977143, awt:1.0, netProfit:null, nems:null, pickupMoney:null, salahEdc:null, ontimeStaging:null, ontimeReceiving:null, accuracyAll:null, respondTime:null},
-  {y:2026, m:9, dsl:0.989568, awt:1.0, netProfit:null, nems:null, pickupMoney:null, salahEdc:null, ontimeStaging:null, ontimeReceiving:null, accuracyAll:null, respondTime:null},
-];
+const SOURCE_KPI_SEED = [{"y":2026,"m":1,"netProfit":0.1,"nems":0.1,"csi":0.1,"dsl":0.970119521912351,"awt":0.1,"audit":0.1,"shrinkage":0.1,"accuracyAll":0.1,"respondTime":0.1,"pickupMoney":0.1,"salahEdc":0.1,"ontimeStaging":0.1,"ontimeReceiving":0.1},
+  {"y":2026,"m":2,"netProfit":0.1,"nems":0.1,"csi":0.1,"dsl":0.968911917098446,"awt":0.1,"audit":0.1,"shrinkage":0.1,"accuracyAll":0.1,"respondTime":0.1,"pickupMoney":0.1,"salahEdc":0.1,"ontimeStaging":0.1,"ontimeReceiving":0.1},
+  {"y":2026,"m":3,"netProfit":0.1,"nems":0.1,"csi":0.1,"dsl":0.97265625,"awt":0.1,"audit":0.1,"shrinkage":0.1,"accuracyAll":0.1,"respondTime":0.1,"pickupMoney":0.1,"salahEdc":0.1,"ontimeStaging":0.1,"ontimeReceiving":0.1},
+  {"y":2026,"m":4,"netProfit":0.1,"nems":0.1,"csi":0.1,"dsl":0.977734753146176,"awt":0.1,"audit":0.1,"shrinkage":0.1,"accuracyAll":0.1,"respondTime":0.1,"pickupMoney":0.1,"salahEdc":0.1,"ontimeStaging":0.1,"ontimeReceiving":0.1},
+  {"y":2026,"m":5,"netProfit":0.1,"nems":0.1,"csi":0.1,"dsl":0.972304648862512,"awt":0.1,"audit":0.1,"shrinkage":0.1,"accuracyAll":0.1,"respondTime":0.1,"pickupMoney":0.1,"salahEdc":0.1,"ontimeStaging":0.1,"ontimeReceiving":0.1},
+  {"y":2026,"m":6,"netProfit":0.1,"nems":0.1,"csi":0.1,"dsl":0.972304648862512,"awt":0.1,"audit":0.1,"shrinkage":0.1,"accuracyAll":0.1,"respondTime":0.1,"pickupMoney":0.1,"salahEdc":0.1,"ontimeStaging":0.1,"ontimeReceiving":0.1},
+  {"y":2026,"m":7,"netProfit":0.1,"nems":0.1,"csi":0.1,"dsl":0.972497249724973,"awt":0.1,"audit":0.1,"shrinkage":0.1,"accuracyAll":0.1,"respondTime":0.1,"pickupMoney":0.1,"salahEdc":0.1,"ontimeStaging":0.1,"ontimeReceiving":0.1},
+  {"y":2026,"m":8,"netProfit":0.1,"nems":0.1,"csi":0.1,"dsl":0.977142857142857,"awt":0.1,"audit":0.1,"shrinkage":0.1,"accuracyAll":0.1,"respondTime":0.1,"pickupMoney":0.1,"salahEdc":0.1,"ontimeStaging":0.1,"ontimeReceiving":0.1},
+  {"y":2026,"m":9,"netProfit":0.1,"nems":0.1,"csi":0.1,"dsl":0.98956780923994,"awt":0.1,"audit":0.1,"shrinkage":0.1,"accuracyAll":0.1,"respondTime":0.1,"pickupMoney":0.1,"salahEdc":0.1,"ontimeStaging":0.1,"ontimeReceiving":0.1}];
+const TL_COM_SEED = [{"name":"Hasbi","raw":"HASBI TL ZONA 01","zona":"Zona 1","kriteria":"Team Leader Commercial","cat":"BUILDING MATERIAL"},
+  {"name":"Zaki","raw":"ZAKI TL ZONA 01","zona":"Zona 1","kriteria":"Team Leader Commercial","cat":"FLOORING AND WALL"},
+  {"name":"Ranicha","raw":"RANICHA TL ZONA 2","zona":"Zona 2","kriteria":"Team Leader Commercial","cat":"BATHROOM"},
+  {"name":"Azam Lutfi","raw":"Azam Lutfi TL ZONA 2","zona":"Zona 3","kriteria":"Team Leader Commercial","cat":"PLUMBING"},
+  {"name":"Octa Febriansyah","raw":"Octa Febriansyah TL ZONA 3","zona":"Zona 3","kriteria":"Team Leader Commercial","cat":"APPLIANCES"},
+  {"name":"Octa Febriansyah","raw":"Octa Febriansyah TL ZONA 3","zona":"Zona 3","kriteria":"Team Leader Commercial","cat":"KITCHEN"},
+  {"name":"Octa Febriansyah","raw":"Octa Febriansyah TL ZONA 3","zona":"Zona 3","kriteria":"Team Leader Commercial","cat":"ELECTRICAL AND LIGHTING"},
+  {"name":"Octa Febriansyah","raw":"Octa Febriansyah TL ZONA 3","zona":"Zona 3","kriteria":"Team Leader Commercial","cat":"MISCELLANEOUS"},
+  {"name":"Ardiansyah Fauzi","raw":"Ardiansyah Fauzi TL ZONA 3","zona":"Zona 3","kriteria":"Team Leader Commercial","cat":"DOORS AND WINDOWS"},
+  {"name":"Ardiansyah Fauzi","raw":"Ardiansyah Fauzi TL ZONA 3","zona":"Zona 3","kriteria":"Team Leader Commercial","cat":"HARDWARE"},
+  {"name":"Ardiansyah Fauzi","raw":"Ardiansyah Fauzi TL ZONA 3","zona":"Zona 3","kriteria":"Team Leader Commercial","cat":"HOUSEWARE & HOBBIES"},
+  {"name":"Ardiansyah Fauzi","raw":"Ardiansyah Fauzi TL ZONA 3","zona":"Zona 3","kriteria":"Team Leader Commercial","cat":"TOOLS"},
+  {"name":"Risang","raw":"RISANG TL ZONA 04","zona":"Zona 4","kriteria":"Team Leader Commercial","cat":"PAINT AND SUNDRIES"}];
 
 // ---- Bobot & target KPI per role, untuk halaman "KPI Store" ----
 // Label role & urutan tombol di halaman KPI Store.
@@ -1122,6 +1165,9 @@ const KPI_INDICATOR_DEFS = [
   { match:h=>h.includes('SALES PROJECT'), key:'salesProject', source:'computed', field:null, defaultBudget:1.00 },
   { match:h=>h.includes('PRIVATE BRAND'), key:'achSalesPB', source:'computed', field:null, defaultBudget:1.00 },
   { match:h=>h.includes('NET PROFIT'), key:'netProfit', source:'sourceKpi', field:'netProfit', defaultBudget:1.00 },
+  { match:h=>h.includes('CSI') || h.includes('MSHOPPER'), key:'csi', source:'sourceKpi', field:'csi', defaultBudget:0.99 },
+  { match:h=>h.includes('AUDIT'), key:'audit', source:'sourceKpi', field:'audit', defaultBudget:0.75 },
+  { match:h=>h.includes('SHRINK'), key:'shrinkage', source:'sourceKpi', field:'shrinkage', defaultBudget:1.00 },
   { match:h=>h.includes('NEMS'), key:'nems', source:'sourceKpi', field:'nems', defaultBudget:1.00 },
   { match:h=>h.trim()==='DSL ALL' || h.includes('DSL'), key:'dsl', source:'sourceKpi', field:'dsl', defaultBudget:0.99 },
   { match:h=>h.trim()==='AWT', key:'awt', source:'sourceKpi', field:'awt', defaultBudget:0.99 },
@@ -1131,8 +1177,8 @@ const KPI_INDICATOR_DEFS = [
   { match:h=>h.includes('ONTIME STAGING') || h.includes('ON TIME STAGING'), key:'ontimeStaging', source:'sourceKpi', field:'ontimeStaging', defaultBudget:1.00 },
   { match:h=>h.includes('ONTIME RECEIVING') || h.includes('ON TIME RECEIVING'), key:'ontimeReceiving', source:'sourceKpi', field:'ontimeReceiving', defaultBudget:1.00 },
   { match:h=>h.includes('ACCURACY'), key:'accuracyAll', source:'sourceKpi', field:'accuracyAll', defaultBudget:0.90 },
-  { match:h=>h.includes('SALES ZONA'), key:'salesZona', source:'none', field:null, defaultBudget:1.00 },
-  { match:h=>h.includes('CATEGORY') || h.includes('SUB CATEGORY'), key:'salesCategory', source:'none', field:null, defaultBudget:1.00 },
+  { match:h=>h.includes('SALES ZONA'), key:'salesZona', source:'computed', field:null, defaultBudget:1.00 },
+  { match:h=>h.includes('CATEGORY') || h.includes('SUB CATEGORY'), key:'salesCategory', source:'computed', field:null, defaultBudget:1.00 },
   { match:h=>h.includes('ACHIEVEMENT SALES PERSON'), key:'achSalesPerson', source:'none', field:null, defaultBudget:1.00 },
   { match:h=>h.includes('NASIONAL') || h.includes('TERITORIAL') || h.includes('REGIONAL'), key:'salesRegional', source:'none', field:null, defaultBudget:1.00 },
 ];
@@ -1146,94 +1192,109 @@ const KPI_ROLE_HEADER_ALIASES = {
 
 // Seed default: hasil baca file "KPI.xlsx" (master matrix bobot & indikator per role) yang diupload.
 // Bisa diganti kapan saja lewat halaman Upload Data → "KPI Bobot & Indikator per Role" tanpa edit kode.
+const KPI_MATRIX_VER = 20261024;
 const KPI_MATRIX_SEED = {
+  __ver: 20261024,
   sm: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.5, source:'computed', field:null },
-    { key:'salesProject', label:"Sales project", budget:1.0, bobot:0.1, source:'computed', field:null },
-    { key:'netProfit', label:"Net profit", budget:1.0, bobot:0.05, source:'sourceKpi', field:'netProfit' },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.2, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.15, source:'sourceKpi', field:'awt' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.35, source:"computed", field:null },
+    { key:"salesProject", label:"Sales project", budget:1.0, bobot:0.1, source:"computed", field:null },
+    { key:"netProfit", label:"Net profit", budget:1.0, bobot:0.05, source:"sourceKpi", field:"netProfit" },
+    { key:"csi", label:"CSI & Mshopper", budget:0.99, bobot:0.05, source:"sourceKpi", field:"csi" },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.1, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.1, source:"sourceKpi", field:"awt" },
+    { key:"audit", label:"Audit", budget:0.75, bobot:0.1, source:"sourceKpi", field:"audit" },
+    { key:"shrinkage", label:"Shrinkgage", budget:1.0, bobot:0.1, source:"sourceKpi", field:"shrinkage" },
+    { key:"accuracyAll", label:"Accuracy All", budget:0.9, bobot:0.05, source:"sourceKpi", field:"accuracyAll" },
   ],
   dsmCommercial: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.6, source:'computed', field:null },
-    { key:'salesProject', label:"Sales project", budget:1.0, bobot:0.1, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.2, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.1, source:'sourceKpi', field:'awt' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.4, source:"computed", field:null },
+    { key:"salesProject", label:"Sales project", budget:1.0, bobot:0.1, source:"computed", field:null },
+    { key:"csi", label:"CSI & Mshopper", budget:0.99, bobot:0.1, source:"sourceKpi", field:"csi" },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.1, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.1, source:"sourceKpi", field:"awt" },
+    { key:"audit", label:"Audit", budget:0.75, bobot:0.1, source:"sourceKpi", field:"audit" },
+    { key:"shrinkage", label:"Shrinkgage", budget:1.0, bobot:0.05, source:"sourceKpi", field:"shrinkage" },
+    { key:"accuracyAll", label:"Accuracy All", budget:0.9, bobot:0.05, source:"sourceKpi", field:"accuracyAll" },
   ],
   dsmFront: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.5, source:'computed', field:null },
-    { key:'nems', label:"NEMS", budget:1.0, bobot:0.1, source:'sourceKpi', field:'nems' },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.15, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.25, source:'sourceKpi', field:'awt' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.3, source:"computed", field:null },
+    { key:"nems", label:"NEMS", budget:1.0, bobot:0.05, source:"sourceKpi", field:"nems" },
+    { key:"csi", label:"CSI & Mshopper", budget:0.99, bobot:0.15, source:"sourceKpi", field:"csi" },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.1, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.15, source:"sourceKpi", field:"awt" },
+    { key:"audit", label:"Audit", budget:0.75, bobot:0.1, source:"sourceKpi", field:"audit" },
+    { key:"shrinkage", label:"Shrinkgage", budget:1.0, bobot:0.1, source:"sourceKpi", field:"shrinkage" },
+    { key:"accuracyAll", label:"Accuracy All", budget:0.9, bobot:0.05, source:"sourceKpi", field:"accuracyAll" },
   ],
   dsmBack: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.5, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.2, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.15, source:'sourceKpi', field:'awt' },
-    { key:'accuracyAll', label:"Accuracy all", budget:0.9, bobot:0.15, source:'sourceKpi', field:'accuracyAll' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.3, source:"computed", field:null },
+    { key:"csi", label:"CSI & Mshopper", budget:0.99, bobot:0.1, source:"sourceKpi", field:"csi" },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.2, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.1, source:"sourceKpi", field:"awt" },
+    { key:"audit", label:"Audit", budget:0.75, bobot:0.1, source:"sourceKpi", field:"audit" },
+    { key:"shrinkage", label:"Shrinkgage", budget:1.0, bobot:0.1, source:"sourceKpi", field:"shrinkage" },
+    { key:"accuracyAll", label:"Accuracy All", budget:0.9, bobot:0.1, source:"sourceKpi", field:"accuracyAll" },
   ],
   tlCom: [
-    { key:'salesZona', label:"Sales zona", budget:1.0, bobot:0.3, source:'none', field:null },
-    { key:'salesCategory', label:"Sales category / sub category", budget:1.0, bobot:0.2, source:'none', field:null },
-    { key:'achSalesPB', label:"Achievement Sales Private Brand", budget:1.0, bobot:0.15, source:'computed', field:null },
-    { key:'nems', label:"NEMS", budget:1.0, bobot:0.05, source:'sourceKpi', field:'nems' },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.15, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.15, source:'sourceKpi', field:'awt' },
+    { key:"salesZona", label:"Sales zona", budget:1.0, bobot:0.3, source:"computed", field:null },
+    { key:"salesCategory", label:"Sales category / sub category", budget:1.0, bobot:0.2, source:"computed", field:null },
+    { key:"achSalesPB", label:"Achievement Sales Private Brand", budget:1.0, bobot:0.15, source:"computed", field:null },
+    { key:"nems", label:"NEMS", budget:1.0, bobot:0.05, source:"sourceKpi", field:"nems" },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.15, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.15, source:"sourceKpi", field:"awt" },
   ],
   tlProject: [
-    { key:'achSalesPB', label:"Achievement Sales Private Brand", budget:1.0, bobot:0.2, source:'computed', field:null },
-    { key:'salesProject', label:"Sales project", budget:1.0, bobot:0.6, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.2, source:'sourceKpi', field:'dsl' },
+    { key:"achSalesPB", label:"Achievement Sales Private Brand", budget:1.0, bobot:0.2, source:"computed", field:null },
+    { key:"salesProject", label:"Sales project", budget:1.0, bobot:0.6, source:"computed", field:null },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.2, source:"sourceKpi", field:"dsl" },
   ],
   tlCasier: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.5, source:'computed', field:null },
-    { key:'nems', label:"NEMS", budget:1.0, bobot:0.1, source:'sourceKpi', field:'nems' },
-    { key:'pickupMoney', label:"PickUp Money", budget:1.0, bobot:0.2, source:'sourceKpi', field:'pickupMoney' },
-    { key:'salahEdc', label:"Salah EDC", budget:1.0, bobot:0.2, source:'sourceKpi', field:'salahEdc' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.5, source:"computed", field:null },
+    { key:"nems", label:"NEMS", budget:1.0, bobot:0.1, source:"sourceKpi", field:"nems" },
+    { key:"pickupMoney", label:"PickUp Money", budget:1.0, bobot:0.2, source:"sourceKpi", field:"pickupMoney" },
+    { key:"salahEdc", label:"Salah EDC", budget:1.0, bobot:0.2, source:"sourceKpi", field:"salahEdc" },
   ],
   tlCsPnd: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.5, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.1, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.2, source:'sourceKpi', field:'awt' },
-    { key:'respondTime', label:"Respond Time", budget:1.0, bobot:0.2, source:'sourceKpi', field:'respondTime' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.5, source:"computed", field:null },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.1, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.2, source:"sourceKpi", field:"awt" },
+    { key:"respondTime", label:"Respond Time", budget:1.0, bobot:0.2, source:"sourceKpi", field:"respondTime" },
   ],
   tlWh: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.4, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.2, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.15, source:'sourceKpi', field:'awt' },
-    { key:'ontimeStaging', label:"Ontime staging", budget:1.0, bobot:0.1, source:'sourceKpi', field:'ontimeStaging' },
-    { key:'accuracyAll', label:"Accuracy all", budget:0.9, bobot:0.15, source:'sourceKpi', field:'accuracyAll' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.4, source:"computed", field:null },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.2, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.15, source:"sourceKpi", field:"awt" },
+    { key:"ontimeStaging", label:"Ontime staging", budget:1.0, bobot:0.1, source:"sourceKpi", field:"ontimeStaging" },
   ],
   tlAdmin: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.4, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.2, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.2, source:'sourceKpi', field:'awt' },
-    { key:'ontimeReceiving', label:"Ontime receiving", budget:1.0, bobot:0.2, source:'sourceKpi', field:'ontimeReceiving' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.4, source:"computed", field:null },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.2, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.2, source:"sourceKpi", field:"awt" },
+    { key:"ontimeReceiving", label:"Ontime receiving", budget:1.0, bobot:0.2, source:"sourceKpi", field:"ontimeReceiving" },
   ],
   pnd: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.5, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.1, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.2, source:'sourceKpi', field:'awt' },
-    { key:'respondTime', label:"Respond Time", budget:1.0, bobot:0.2, source:'sourceKpi', field:'respondTime' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.5, source:"computed", field:null },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.1, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.2, source:"sourceKpi", field:"awt" },
+    { key:"respondTime", label:"Respond Time", budget:1.0, bobot:0.2, source:"sourceKpi", field:"respondTime" },
   ],
   cs: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.5, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.1, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.2, source:'sourceKpi', field:'awt' },
-    { key:'respondTime', label:"Respond Time", budget:1.0, bobot:0.2, source:'sourceKpi', field:'respondTime' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.5, source:"computed", field:null },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.1, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.2, source:"sourceKpi", field:"awt" },
+    { key:"respondTime", label:"Respond Time", budget:1.0, bobot:0.2, source:"sourceKpi", field:"respondTime" },
   ],
   wh: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.4, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.2, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.15, source:'sourceKpi', field:'awt' },
-    { key:'ontimeStaging', label:"Ontime staging", budget:1.0, bobot:0.1, source:'sourceKpi', field:'ontimeStaging' },
-    { key:'accuracyAll', label:"Accuracy all", budget:0.9, bobot:0.15, source:'sourceKpi', field:'accuracyAll' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.4, source:"computed", field:null },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.2, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.15, source:"sourceKpi", field:"awt" },
+    { key:"ontimeStaging", label:"Ontime staging", budget:1.0, bobot:0.1, source:"sourceKpi", field:"ontimeStaging" },
   ],
   admin: [
-    { key:'salesStore', label:"Sales store", budget:1.0, bobot:0.4, source:'computed', field:null },
-    { key:'dsl', label:"DSL All", budget:0.99, bobot:0.2, source:'sourceKpi', field:'dsl' },
-    { key:'awt', label:"AWT", budget:0.99, bobot:0.2, source:'sourceKpi', field:'awt' },
-    { key:'ontimeReceiving', label:"Ontime receiving", budget:1.0, bobot:0.2, source:'sourceKpi', field:'ontimeReceiving' },
+    { key:"salesStore", label:"Sales store", budget:1.0, bobot:0.4, source:"computed", field:null },
+    { key:"dsl", label:"DSL All", budget:0.99, bobot:0.2, source:"sourceKpi", field:"dsl" },
+    { key:"awt", label:"AWT", budget:0.99, bobot:0.2, source:"sourceKpi", field:"awt" },
+    { key:"ontimeReceiving", label:"Ontime receiving", budget:1.0, bobot:0.2, source:"sourceKpi", field:"ontimeReceiving" },
   ],
 };
 
@@ -1438,6 +1499,8 @@ const STATE = {
   kpiMatrix: SEED.kpiMatrix ? JSON.parse(JSON.stringify(SEED.kpiMatrix)) : JSON.parse(JSON.stringify(KPI_MATRIX_SEED)), // roleKey -> [{key,label,budget,bobot,source,field}] — dari upload "KPI Bobot & Indikator per Role"
   meta: {...SEED.meta},
   uploadStatus: { sales: 'default', budgetStore: 'default', budgetPB: 'default', budgetProject: 'default', sqv: 'default', stockDC: 'default', traffic: 'default', salper: 'default', tlMentor: 'default', sourceKpi: 'default', kpiMatrix: 'default', belting: 'default', member: 'default' },
+  tlCom: JSON.parse(JSON.stringify(SEED.tlCom||TL_COM_SEED)), // {name,raw,zona,kriteria,cat} — Team Leader Commercial: zona & kategori yang dipegang (Source KPI → Source 2)
+  selectedKpiTl: '', selectedKpiYear: 0,
   selectedKpiRole: 'sm', // role yang sedang dipilih di halaman "KPI Store"
   beltingInternal: JSON.parse(JSON.stringify(SEED.beltingInternal||BELTING_SEED.internal)), // {id,name,section,job,join,s360,tech,comp,perf,pos} — Belting Internal
   beltingPB: JSON.parse(JSON.stringify(SEED.beltingPB||BELTING_SEED.pb)), // {period,pLabel,pKey,id,name,location,section,level,job,join,lms,s360,tech,comp,perf,pos} — Belting Private Brand (banyak periode)
@@ -1548,7 +1611,7 @@ function dcSiteList(){
 // as possible (few large requests, not many small ones — avoids rate limits).
 // ============================================================
 const PERSIST_PREFIX = 'retailpulse_v2_';
-const PERSIST_KEYS = ['salesFact','brandFact','itemFact','itemDayFact','itemMeta','spFact','sourceFact','sourceDailyFact','hourFact','brandDayFact','sourceZonaFact','notaFact','notaCatFact','spCatFact','dcAging','dataMeta',
+const PERSIST_KEYS = ['salesFact','brandFact','itemFact','itemDayFact','itemMeta','spFact','sourceFact','sourceDailyFact','hourFact','brandDayFact','sourceZonaFact','notaFact','notaCatFact','spCatFact','tlCom','dcAging','dataMeta',
   'budgetStoreFact','budgetPBFact','budgetDailyFact','budgetProjectMonthly','sqvItems',
   'dcByItem','dcBySite','dcBySiteStatus','dcSites','uploadStatus','trafficFact','salperFact','tlMentor','budgetSalperFact','sourceKpi','kpiMatrix','beltingInternal','beltingPB','memberDb','memberTx'];
 const PERSIST_CHUNK_SIZE = 3.5 * 1024 * 1024; // chars per chunk, safely under the 5MB/key limit
@@ -1594,6 +1657,11 @@ async function tryLoadPersistedState(){
     if(sd && (!pd || sd > pd)){ keepSeed[mk] = {meta: STATE.dataMeta[mk], keys}; keys.forEach(k=>{ keepSeed[k] = STATE[k]; }); } });
   PERSIST_KEYS.forEach(k => { if(payload[k] === undefined) return; if(k==='memberDb' && (!payload[k] || !payload[k].length) && STATE.memberDb.length) return; STATE[k] = payload[k]; }); // database member bawaan tidak boleh tertimpa data kosong
   try{ const sm = (SEED.itemMeta||{}); for(const k in sm){ const t = STATE.itemMeta[k]; if(t && t.pb===undefined && sm[k].pb) t.pb = sm[k].pb; } }catch(e){} // penanda Private/Exclusive Brand dari data bawaan
+  try{ // matriks KPI / Source KPI versi lama (sebelum indikator SM-DSM & TL Com diperbarui) diganti data bawaan terbaru
+    if(((STATE.kpiMatrix && STATE.kpiMatrix.__ver)||0) < KPI_MATRIX_VER){ STATE.kpiMatrix = JSON.parse(JSON.stringify(KPI_MATRIX_SEED)); if(STATE.uploadStatus) STATE.uploadStatus.kpiMatrix = 'default'; }
+    if((STATE.sourceKpi||[]).some(r=>r.csi===undefined)){ const keep = (STATE.sourceKpi||[]).filter(r=>r.csi!==undefined); STATE.sourceKpi = keep.concat(JSON.parse(JSON.stringify(SOURCE_KPI_SEED)).filter(r=>!keep.some(k=>k.y===r.y&&k.m===r.m))); }
+    if(!(STATE.tlCom||[]).length) STATE.tlCom = JSON.parse(JSON.stringify(TL_COM_SEED));
+  }catch(e){}
   Object.keys(keepSeed).forEach(k=>{ if(k==='sqv' || k==='dc' || k==='salper'){ STATE.dataMeta = STATE.dataMeta || {}; STATE.dataMeta[k] = keepSeed[k].meta; if(STATE.uploadStatus) STATE.uploadStatus[{sqv:'sqv', dc:'stockDC', salper:'salper'}[k]] = 'default'; } else STATE[k] = keepSeed[k]; });
   return true;
 }
@@ -2320,6 +2388,9 @@ async function parseBudgetProjectFile(file){
 // Salah EDC, Ontime staging, Ontime receiving, Accuracy all (nilai rasio 0..1 atau %). Kolom yang tidak ada di
 // file akan diisi null (dianggap belum ada data) tanpa membuat upload gagal.
 const SOURCE_KPI_COLUMNS = [
+  {key:'csi',             match:h=>h.includes('CSI') || h.includes('MSHOPPER')},
+  {key:'audit',           match:h=>h==='AUDIT' || h.includes('AUDIT')},
+  {key:'shrinkage',       match:h=>h.includes('SHRINK')},
   {key:'dsl',             match:h=>h==='DSL' || h.includes('DSL')},
   {key:'awt',             match:h=>h==='AWT' || h.includes('AWT')},
   {key:'netProfit',       match:h=>h.includes('NET PROFIT')},
@@ -2343,28 +2414,40 @@ async function parseSourceKpiFile(file){
     if(norm.includes('BULAN')){ headerIdx = i; header = norm; break; }
   }
   if(headerIdx===-1) throw new Error('Format tidak dikenali: header "Bulan" tidak ditemukan.');
-  const iBulan = header.indexOf('BULAN');
+  const iBulan = header.indexOf('BULAN'), iTahun = header.indexOf('TAHUN');
   const colIdx = {};
   SOURCE_KPI_COLUMNS.forEach(c=>{ colIdx[c.key] = header.findIndex(c.match); });
   if(Object.values(colIdx).every(i=>i===-1)) throw new Error('Tidak ada kolom indikator KPI (DSL, AWT, Net profit, NEMS, dst) yang dikenali.');
-  const y = latestYMD().y || (new Date().getFullYear());
+  const y0 = latestYMD().y || (new Date().getFullYear());
   const out = [];
   for(let i=headerIdx+1;i<rows.length;i++){
     const row = rows[i]; if(!row) continue;
     const bulanRaw = String(row[iBulan]||'').trim().toUpperCase();
     const m = TRAFFIC_MONTH_MAP[bulanRaw];
     if(!m) continue;
-    const rec = {y, m};
+    const yy = iTahun!==-1 ? Math.round(toNum(row[iTahun])||0) : 0;
+    const rec = {y: (yy>=2000 && yy<=2100) ? yy : y0, m};
     SOURCE_KPI_COLUMNS.forEach(c=>{
       const idx = colIdx[c.key];
       const raw = idx===-1 ? null : row[idx];
       rec[c.key] = (raw===undefined||raw===null||raw==='') ? null : toNum(raw);
     });
-    out.push(rec);
+    if(SOURCE_KPI_COLUMNS.some(c=>rec[c.key]!==null)) out.push(rec); // bulan yang belum terisi tidak menimpa data lama
   }
-  if(!out.length) throw new Error('Tidak ada baris bulan yang valid ditemukan di file ini.');
-  return out;
+  if(!out.length) throw new Error('Tidak ada baris bulan yang berisi nilai KPI di file ini.');
+  // Sheet ke-2 (Source 2): Team Leader Commercial → zona & Sales category / sub category yang dipegang
+  let tlCom = [];
+  for(const sn of wb.SheetNames.slice(1)){
+    const r2 = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1});
+    const hi = r2.findIndex(r=>(r||[]).some(c=>String(c||'').trim().toUpperCase()==='TEAM LEADER NAME'));
+    if(hi===-1) continue;
+    const H = r2[hi].map(c=>String(c||'').trim().toUpperCase()), iN = H.indexOf('TEAM LEADER NAME'), iZ = H.indexOf('ZONA'), iK = H.findIndex(h=>h.startsWith('KRITERIA')), iC = H.findIndex(h=>h.includes('CATEGORY'));
+    for(let i=hi+1;i<r2.length;i++){ const r = r2[i]; if(!r || !r[iN]) continue; const raw = String(r[iN]).trim();
+      tlCom.push({name:kpiTlName(raw), raw, zona:String(r[iZ]||'').trim(), kriteria:String(r[iK]||'').trim(), cat:String(r[iC]||'').trim().toUpperCase()}); }
+  }
+  return {rows:out, tlCom};
 }
+function kpiTlName(raw){ return String(raw||'').replace(/\s+TL\s+ZONA\s*\d+\s*$/i,'').trim().split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' '); }
 function mergeSourceKpi(rows){
   const touched = new Set(rows.map(r=>r.y+'-'+r.m));
   STATE.sourceKpi = (STATE.sourceKpi||[]).filter(r=>!touched.has(r.y+'-'+r.m)).concat(rows);
@@ -2416,6 +2499,7 @@ async function parseKpiMatrixFile(file){
   }
   const hasAny = KPI_STORE_ROLE_ORDER.some(rk=>matrix[rk].length>0);
   if(!hasAny) throw new Error('Tidak ada baris indikator KPI yang valid ditemukan di file ini.');
+  matrix.__ver = Date.now(); // tanda: matriks hasil upload admin (lebih baru daripada bawaan)
   return { matrix, skippedLabels };
 }
 
@@ -3466,29 +3550,57 @@ function itemLastSaleMap(){
 //  - Sales project = Actual Sales Project / Budget Project bulan itu
 //  - Indikator lain (DSL, AWT, Net profit, NEMS, PickUp Money, Salah EDC, Ontime staging, Ontime receiving,
 //    Accuracy all) = langsung dari data upload "Source KPI" (bukan dihitung dari data sales)
-function kpiStoreAchievement(y, m){
+// Team Leader Commercial (Source KPI → Source 2): tiap TL punya zona & daftar Sales category yang dipegang sendiri.
+function kpiTlList(){
+  const g = new Map();
+  (STATE.tlCom||[]).forEach(r=>{ const k = r.raw || r.name; if(!k) return; if(!g.has(k)) g.set(k, {key:k, name:r.name||kpiTlName(k), zona:r.zona, cats:[]});
+    const c = String(r.cat||'').trim().toUpperCase(); const t = g.get(k); if(c && !t.cats.includes(c)) t.cats.push(c); });
+  g.forEach(t=>{ const mm = String(t.key).match(/ZONA\s*0*(\d+)\s*$/i); if(mm && ('Zona '+mm[1])!==t.zona){ t.zonaNote = 'Di file tertulis '+t.zona+', tetapi nama "'+t.key+'" → dipakai Zona '+mm[1]; t.zona = 'Zona '+mm[1]; } });
+  return [...g.values()];
+}
+function kpiTlAch(y, m, tl){
+  if(!tl || !STATE.salesFact.some(r=>r.y===y && r.m===m)) return {zona:null, cat:null};
+  const bud = budgetByCatForMonths([m], 'budgetStoreFact', y), catSet = new Set(tl.cats);
+  let zA=0, zB=0, cA=0, cB=0;
+  STATE.salesFact.forEach(r=>{ if(r.y!==y || r.m!==m) return; const c = String(r.cat||'').trim().toUpperCase(); if(catToZona(c,m)===tl.zona) zA += r.amt; if(catSet.has(c)) cA += r.amt; });
+  bud.forEach((v,cat)=>{ const c = String(cat||'').trim().toUpperCase(); if(catToZona(c,m)===tl.zona) zB += v; if(catSet.has(c)) cB += v; });
+  return {zona: zB>0 ? safeDiv(zA,zB) : null, cat: cB>0 ? safeDiv(cA,cB) : null};
+}
+function kpiYears(){
+  const ys = new Set(); STATE.salesFact.forEach(r=>ys.add(r.y)); (STATE.sourceKpi||[]).forEach(r=>ys.add(r.y));
+  const latest = latestYM().y || new Date().getFullYear(); ys.add(latest); ys.add(latest+1); // tahun berikutnya disiapkan untuk data baru
+  return [...ys].sort();
+}
+function kpiMonthsOf(y){
+  const ms = new Set(availableMonths(y)); (STATE.sourceKpi||[]).forEach(r=>{ if(r.y===y && SOURCE_KPI_COLUMNS.some(c=>r[c.key]!=null)) ms.add(r.m); });
+  return ms.size ? [...ms].sort((a,b)=>a-b) : [1,2,3,4,5,6,7,8,9,10,11,12];
+}
+function kpiStoreAchievement(y, m, tl){
+  const hasSales = STATE.salesFact.some(r=>r.y===y && r.m===m);
   const salesTokoActual = STATE.salesFact.filter(r=>r.y===y && r.m===m).reduce((a,r)=>a+r.amt,0);
   const salesTokoBudget = [...budgetByCatForMonths([m],'budgetStoreFact',y).values()].reduce((a,v)=>a+v,0);
-  const achSalesStore = salesTokoBudget>0 ? safeDiv(salesTokoActual, salesTokoBudget) : null;
+  const achSalesStore = (hasSales && salesTokoBudget>0) ? safeDiv(salesTokoActual, salesTokoBudget) : null;
 
   const projActual = STATE.sourceFact.filter(r=>r.y===y && r.m===m && r.source==='Sales Project').reduce((a,r)=>a+r.amt,0);
   const projBudget = (STATE.budgetProjectMonthly[m]||0) * dayProrationFactorForMonth(y, m);
-  const achSalesProject = projBudget>0 ? safeDiv(projActual, projBudget) : null;
+  const achSalesProject = (hasSales && projBudget>0) ? safeDiv(projActual, projBudget) : null;
 
   const pbActual = STATE.salesFact.filter(r=>r.y===y && r.m===m).reduce((a,r)=>a+(r.pbAmt||0),0);
   const pbBudget = [...budgetByCatForMonths([m],'budgetPBFact',y).values()].reduce((a,v)=>a+v,0);
-  const achSalesPB = pbBudget>0 ? safeDiv(pbActual, pbBudget) : null;
+  const achSalesPB = (hasSales && pbBudget>0) ? safeDiv(pbActual, pbBudget) : null;
 
   const srcRec = (STATE.sourceKpi||[]).find(r=>r.y===y && r.m===m);
   const pick = (k)=> srcRec && srcRec[k]!=null ? srcRec[k] : null;
+  const tz = kpiTlAch(y, m, tl);
 
   return {
     salesStore: achSalesStore, salesProject: achSalesProject, achSalesPB: achSalesPB,
-    dsl: pick('dsl'), awt: pick('awt'), netProfit: pick('netProfit'), nems: pick('nems'),
+    dsl: pick('dsl'), awt: pick('awt'), netProfit: pick('netProfit'), nems: pick('nems'), csi: pick('csi'), audit: pick('audit'), shrinkage: pick('shrinkage'),
     pickupMoney: pick('pickupMoney'), salahEdc: pick('salahEdc'), respondTime: pick('respondTime'),
     ontimeStaging: pick('ontimeStaging'), ontimeReceiving: pick('ontimeReceiving'), accuracyAll: pick('accuracyAll'),
-    // Belum ada sumber data otomatis di dashboard ini untuk indikator berikut — akan tampil "-":
-    salesZona: null, salesCategory: null, achSalesPerson: null, salesRegional: null,
+    // TL Commercial: Sales zona & Sales category / sub category tiap TL (dari pemetaan Source KPI → Source 2)
+    salesZona: tz.zona, salesCategory: tz.cat,
+    achSalesPerson: null, salesRegional: null,
   };
 }
 // Nilai (score) = (Ach / Budget) x Bobot — TIDAK dibatasi (overachieve menambah nilai proporsional).
@@ -3497,10 +3609,10 @@ function kpiScore(ach, budget, bobot){
   if(ach===null || ach===undefined || !budget) return null;
   return safeDiv(ach, budget) * bobot;
 }
-function kpiStoreMonthlyRows(y, monthsList, roleKey){
+function kpiStoreMonthlyRows(y, monthsList, roleKey, tl){
   const items = (STATE.kpiMatrix && STATE.kpiMatrix[roleKey]) || [];
   return monthsList.map(m=>{
-    const ach = kpiStoreAchievement(y, m);
+    const ach = kpiStoreAchievement(y, m, tl);
     const byKpi = {};
     items.forEach((c,idx)=>{
       const a = ach[c.key];
@@ -3570,6 +3682,7 @@ function mkChart(id, config){
 let currentSection = null;
 function showSection(id){
   if(window.__ROLE==='viewer' && (id==='customer' || id==='upload')) id = 'overview';
+  if(window.__ROLE==='admin' && !window.__UPLOAD_OK && id==='upload') id = 'overview';
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('nav-'+id).classList.add('active');
   document.getElementById('topbar-title').textContent = TITLES[id];
@@ -3969,7 +4082,7 @@ RENDERERS.upload = function(container){
     ${uploadCard('budgetProject', 'Budget Project (.xlsx)', 'File dengan sheet "By month" (format Budget SSP).', '.xlsx', false, statusText('budgetProject'))}
     ${uploadCard('sqv', 'Stock Qty & Value / SQV (.xlsx)', 'Acuan inventory value & class A/B/C/D.', '.xlsx', false, statusText('sqv'))}
     ${uploadCard('stockDC', 'Stock DC (.xlsx)', 'Stock warehouse by location — mendukung banyak DC (Balongbendo, Cipeucang, Cikupa, dst) secara otomatis.', '.xlsx', false, statusText('stockDC'))}
-    ${uploadCard('sourceKpi', 'Source KPI (.xlsx/.ods)', 'Kolom: Bulan, DSL, AWT, Net profit, NEMS, PickUp Money, Salah EDC, Ontime staging, Ontime receiving, Accuracy all, Respond Time — nilai Achievement per bulan (rasio 0-1, mis. 0.97 = 97%). Dipakai di halaman KPI Store (kolom yang tidak ada di file akan dianggap kosong).', '.xlsx,.xls,.ods', false, statusText('sourceKpi'))}
+    ${uploadCard('sourceKpi', 'Source KPI (.xlsx/.ods)', 'Sheet 1 (Source 1): Tahun, Bulan, Net profit, NEMS, CSI &amp; Mshopper, DSL All, AWT, Audit, Shrinkgage, Accuracy All, Respond Time, PickUp Money, Salah EDC, Ontime staging, Ontime receiving — nilai per bulan (rasio 0-1, mis. 0.97 = 97%). Kolom Tahun dipakai untuk filter tahun (siap untuk 2027). Sheet 2 (Source 2): Team Leader Name, Zona, Kriteria, Sales category / sub category — pemetaan indikator tiap TL Commercial. Dipakai di halaman KPI Store.', '.xlsx,.xls,.ods', false, statusText('sourceKpi'))}
     ${uploadCard('kpiMatrix', 'KPI Bobot &amp; Indikator per Role (.xlsx)', 'Upload ulang file matrix KPI (format sama seperti KPI.xlsx: kolom No, KPI, Budget, lalu 1 kolom per role) untuk mengubah bobot/indikator halaman KPI Store tanpa edit kode. Kolom role yang dikenali: SM, DSM Commercial, DSM Front, DSM Back, Tl com, Tl Project, Tl Cashier, Tl CS&amp;PND, Tl WH, Tl Admin, PnD, CS, WH, Admin. Tombol Kosongkan akan mengembalikan ke bobot bawaan (file KPI.xlsx awal).', '.xlsx,.xls', false, statusText('kpiMatrix'))}
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);margin:24px 0 8px;">Belting</div>
     ${uploadCard('belting', 'Belting Internal &amp; Private Brand (.xlsx/.ods)', 'Satu file berisi 2 sheet: <b>\'Belting Internal\'</b> (Employee Name, Employee ID, Section During Belting, <b>Current Job Title</b>, Join Date, 360 Degree / Technical-course / Competency / Performance Score, Belting Position) dan <b>\'Belting Private Brand\'</b> (Belting Title sebagai periode, Employee Name, Current Location, Current Job Title, Join Date, skor Lms-learningpath / Competency / Performance — atau 5 skor termasuk 360 &amp; Technical — dan Belting Position). Belting Internal akan diganti seluruhnya; Belting Private Brand menggantikan periode yang sama dan menambah periode baru. Jika hanya salah satu sheet yang ada di file, data sheet lainnya tidak diubah.', '.xlsx,.xls,.ods', false, statusText('belting'), 'Pilih File Belting')}
@@ -3995,6 +4108,7 @@ RENDERERS.upload = function(container){
   function log(msg, isErr){
     const el = document.getElementById('upload-log');
     el.style.display='block';
+    if(!isErr) window.__uploadNote = String(msg).replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim().slice(0,200);
     el.innerHTML = (isErr?'<b style="color:var(--bad)">Error:</b> ':'<b>Info:</b> ') + msg;
   }
   function refreshStatus(id){
@@ -4125,9 +4239,9 @@ RENDERERS.upload = function(container){
 
   document.getElementById('upfile-sourceKpi').addEventListener('change', async (e)=>{
     const f = e.target.files[0]; if(!f) return;
-    try{ const r = await parseSourceKpiFile(f); mergeSourceKpi(r);
+    try{ const res = await parseSourceKpiFile(f), r = res.rows; mergeSourceKpi(r); if(res.tlCom.length) STATE.tlCom = res.tlCom;
       STATE.uploadStatus.sourceKpi='uploaded'; refreshStatus('sourceKpi');
-      log(`Source KPI berhasil diproses (${r.length} baris bulan). Bulan yang terdeteksi: ${r.map(x=>x.m).sort((a,b)=>a-b).join(', ')}.`);
+      log(`Source KPI berhasil diproses (${r.length} baris bulan). Periode terdeteksi: ${[...new Set(r.map(x=>x.y+'-'+String(x.m).padStart(2,'0')))].sort().join(', ')}.${res.tlCom.length?` Pemetaan TL Commercial: ${new Set(res.tlCom.map(t=>t.raw)).size} TL, ${res.tlCom.length} kategori.`:''}`);
       rendered_reset();
     } catch(err){ log(err.message, true); }
   });
@@ -6658,7 +6772,10 @@ RENDERERS.belting = function(container){
 };
 
 RENDERERS.kpi = function(container){
+  const yrs = kpiYears(); if(!yrs.includes(STATE.selectedKpiYear)) STATE.selectedKpiYear = latestYM().y || yrs[yrs.length-1];
   container.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;"><label for="kpi-year" style="font-weight:700;font-size:12.5px;">Tahun</label>
+      <select id="kpi-year" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:#fff;">${yrs.map(y=>`<option value="${y}" ${y===STATE.selectedKpiYear?'selected':''}>${y}</option>`).join('')}</select></div>
     <div class="kpi-role-tabs" id="kpi-role-tabs" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;">
       ${KPI_STORE_ROLE_ORDER.map(rk=>`<button type="button" class="chip kpi-role-btn ${rk===STATE.selectedKpiRole?'active':''}" data-role="${rk}" style="padding:7px 14px;font-size:12.5px;">${KPI_STORE_ROLE_LABELS[rk]}</button>`).join('')}
     </div>
@@ -6671,17 +6788,25 @@ RENDERERS.kpi = function(container){
       renderKpiStoreBody(document.getElementById('kpi-store-body'), STATE.selectedKpiRole);
     });
   });
+  container.querySelector('#kpi-year').addEventListener('change', e=>{ STATE.selectedKpiYear = +e.target.value; renderKpiStoreBody(document.getElementById('kpi-store-body'), STATE.selectedKpiRole); });
   renderKpiStoreBody(document.getElementById('kpi-store-body'), STATE.selectedKpiRole);
 };
 
 function renderKpiStoreBody(container, roleKey){
-  const roleLabel = KPI_STORE_ROLE_LABELS[roleKey] || roleKey;
+  // TL Com: tiap Team Leader punya indikator sendiri (zona & kategori yang dipegang) → pilih TL dulu
+  const tlAll = roleKey==='tlCom' ? kpiTlList() : [];
+  const tl = tlAll.length ? (tlAll.find(t=>t.key===STATE.selectedKpiTl) || tlAll[0]) : null;
+  if(tl) STATE.selectedKpiTl = tl.key;
+  const roleLabel = (KPI_STORE_ROLE_LABELS[roleKey] || roleKey) + (tl ? ' — ' + tl.name : '');
+  const tlBar = roleKey!=='tlCom' ? '' : (tlAll.length
+    ? `<div style="margin-bottom:14px;"><div style="font-weight:700;font-size:12.5px;margin-bottom:6px;">Team Leader Commercial</div><div style="display:flex;flex-wrap:wrap;gap:7px;">${tlAll.map(t=>`<button type="button" class="chip kpi-tl-btn ${t.key===tl.key?'active':''}" data-tl="${String(t.key).replace(/"/g,'&quot;')}" style="padding:6px 12px;font-size:12.5px;">${t.name} · ${t.zona}</button>`).join('')}</div>
+        <div class="footnote-box" style="margin-top:8px;"><b>${tl.name}</b> — Sales zona = penjualan <b>${tl.zona}</b> ÷ budget ${tl.zona}; Sales category / sub category = penjualan kategori <b>${tl.cats.join(', ')}</b> ÷ budget kategori tersebut. ${tl.zonaNote?`<br>⚠ ${tl.zonaNote}.`:''}</div></div>`
+    : `<div class="footnote-box" style="margin-bottom:14px;">Pemetaan Team Leader Commercial belum ada. Upload file Source KPI (sheet "Source 2": Team Leader Name, Zona, Kriteria, Sales category / sub category) di halaman Upload Data.</div>`);
   const roleItems = (STATE.kpiMatrix && STATE.kpiMatrix[roleKey]) || [];
   const noDataItems = roleItems.filter(c=>c.source==='none');
-  const curYear = latestYM().y || 2026;
-  const months = availableMonths(curYear);
-  const monthsList = months.length ? months : [latestYMD().m || 1];
-  const rows = kpiStoreMonthlyRows(curYear, monthsList, roleKey);
+  const curYear = STATE.selectedKpiYear || latestYM().y || 2026;
+  const monthsList = kpiMonthsOf(curYear);
+  const rows = kpiStoreMonthlyRows(curYear, monthsList, roleKey, tl);
   const latestRow = rows[rows.length-1];
   const scoreColor = (v)=> v>=0.9?'#2F7A4F':(v>=0.7?'#B8860B':'#B23A2E');
   // Palet warna lembut yang beda-beda per bulan, supaya blok Ach/Nilai tiap bulan mudah dibedakan mata saat scroll ke samping.
@@ -6694,9 +6819,9 @@ function renderKpiStoreBody(container, roleKey){
     return;
   }
 
-  container.innerHTML = `
+  container.innerHTML = `${tlBar}
     <div class="footnote-box" style="margin-bottom:18px;">
-      KPI ditampilkan khusus untuk role <b>${roleLabel}</b> — Budget &amp; Bobot mengikuti file master <b>KPI.xlsx</b> (bisa diganti lewat halaman Upload Data → "KPI Bobot &amp; Indikator per Role"). <b>Ach</b> = pencapaian aktual bulan tersebut, <b>Nilai</b> = (Ach ÷ Budget) × Bobot. Sales store, Sales project &amp; Achievement Sales Private Brand dihitung otomatis dari data Sales/Budget yang sudah ada; indikator lain (DSL, AWT, Net profit, NEMS, PickUp Money, Salah EDC, Ontime staging, Ontime receiving, Accuracy all, Respond Time) diambil dari file upload "Source KPI".
+      KPI ditampilkan khusus untuk role <b>${roleLabel}</b> — Budget &amp; Bobot mengikuti file master <b>KPI.xlsx</b> (bisa diganti lewat halaman Upload Data → "KPI Bobot &amp; Indikator per Role"). <b>Ach</b> = pencapaian aktual bulan tersebut, <b>Nilai</b> = (Ach ÷ Budget) × Bobot. Sales store, Sales project, Achievement Sales Private Brand, Sales zona &amp; Sales category dihitung otomatis dari data Sales/Budget yang sudah ada; indikator lain (Net profit, NEMS, CSI &amp; Mshopper, DSL, AWT, Audit, Shrinkgage, Accuracy all, Respond Time, PickUp Money, Salah EDC, Ontime staging, Ontime receiving) diambil dari file upload "Source KPI" (nilai per Tahun &amp; Bulan).
       ${noDataItems.length?`<br><br>⚠ Indikator berikut belum punya sumber data otomatis di dashboard ini, jadi Ach/Nilai akan tampil "-" (belum menyumbang skor): <b>${noDataItems.map(c=>c.label).join(', ')}</b>.`:''}
     </div>
     <div class="kpi-row">
@@ -6746,6 +6871,7 @@ function renderKpiStoreBody(container, roleKey){
     </div>
   `;
 
+  container.querySelectorAll('.kpi-tl-btn').forEach(b=>b.addEventListener('click', ()=>{ STATE.selectedKpiTl = b.dataset.tl; renderKpiStoreBody(container, roleKey); }));
   const trendVals = rows.map(r=>+(r.totalNilai*100).toFixed(1));
   const trendMax = Math.max(100, ...trendVals);
   // Beri ruang ekstra 20% di atas nilai tertinggi (min headroom 15 poin) supaya titik & label yang >100% tidak terpotong.
@@ -7161,7 +7287,7 @@ function lsSet(k,v){ try{ if(v===null) localStorage.removeItem(k); else localSto
     baseUp(container);
     const card = document.createElement('div'); card.className = 'panel'; card.style.marginTop = '18px';
     card.innerHTML = `<div class="panel-head"><div class="panel-title">Backup, Restore &amp; Keamanan</div>
-      <div class="panel-note">Data dashboard tersimpan di browser ini. Backup berkala disarankan, terutama sebelum membersihkan cache / pindah komputer.</div></div>
+      <div class="panel-note">Data dashboard tersimpan di server (semua pengguna melihat data yang sama). Unduh backup secara berkala (mis. setiap selesai upload besar) sebagai cadangan; file backup bisa dipulihkan lewat tombol Restore.</div></div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;"><button class="btn" id="bk-export">⬇ Backup semua data</button>
         <label class="file-input-label">⬆ Restore dari backup<input type="file" id="bk-import" accept=".json,.gz,.gzip"></label><span id="bk-status" style="font-size:12.5px;color:var(--ink-soft);"></span></div>
       <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);"><div class="panel-title" style="font-size:14px;">Kunci tab Belting dengan PIN</div>
@@ -7169,6 +7295,24 @@ function lsSet(k,v){ try{ if(v===null) localStorage.removeItem(k); else localSto
           <button class="btn secondary" id="pin-set">Set PIN</button><button class="btn secondary" id="pin-clear">Hapus PIN</button><span id="pin-status" style="font-size:12.5px;color:var(--ink-soft);">${lsGet('dash_belting_pin')?'PIN aktif di browser ini.':'Belum ada PIN.'}</span></div>
         <div class="footnote-box" style="margin-top:10px;">PIN hanya mengunci tampilan di browser ini — <b>bukan pengamanan sebenarnya</b>: siapa pun yang memegang file HTML ini tetap bisa membaca datanya. Untuk akses banyak pengguna dengan hak akses, simpan dashboard di hosting berlogin (mis. Google Workspace, SharePoint/Intranet).</div></div>`;
     container.appendChild(card);
+    if(typeof window.__history==='function'){
+      const hp = document.createElement('div'); hp.style.cssText = 'margin-top:18px;padding-top:14px;border-top:1px solid var(--line);';
+      hp.innerHTML = '<div class="panel-title" style="font-size:14px;">Riwayat Upload (30 terakhir)</div><div id="hist-box" style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);">Memuat…</div>';
+      card.appendChild(hp);
+    }
+    const esc2 = x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    async function loadHist(wait){
+      const box = card.querySelector('#hist-box'); if(!box || typeof window.__history!=='function') return;
+      try{
+        if(wait) await new Promise(r=>setTimeout(r, wait));
+        const h = await window.__history();
+        if(!h.length){ box.textContent = 'Belum ada riwayat — akan tercatat mulai upload berikutnya.'; return; }
+        box.innerHTML = '<div style="overflow:auto;max-height:260px;"><table class="sp-t" style="border-collapse:collapse;width:100%;font-size:12.5px;"><thead><tr style="text-align:left;"><th style="padding:4px 8px;">Waktu</th><th style="padding:4px 8px;">Admin</th><th style="padding:4px 8px;">Keterangan</th><th style="padding:4px 8px;text-align:right;">Ukuran</th></tr></thead><tbody>'
+          + h.map(r=>'<tr style="border-top:1px solid var(--line);"><td style="padding:4px 8px;white-space:nowrap;">'+esc2(new Date(r.t).toLocaleString('id-ID',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}))+'</td><td style="padding:4px 8px;">'+esc2(r.name||r.user)+'</td><td style="padding:4px 8px;">'+esc2(r.note||'Simpan data')+'</td><td style="padding:4px 8px;text-align:right;white-space:nowrap;">'+(r.kb>=1024?(r.kb/1024).toFixed(1)+' MB':r.kb+' KB')+'</td></tr>').join('')
+          + '</tbody></table></div>';
+      }catch(e){ box.textContent = 'Riwayat tidak dapat dimuat.'; }
+    }
+    loadHist(0);
     const st = t=>{ const el = card.querySelector('#bk-status'); if(el) el.textContent = t; };
     card.querySelector('#bk-export').addEventListener('click', async ()=>{
       try{ st('Menyiapkan backup…');
@@ -7186,7 +7330,8 @@ function lsSet(k,v){ try{ if(v===null) localStorage.removeItem(k); else localSto
         if(buf[0]===0x1f && buf[1]===0x8b){ if(typeof DecompressionStream==='undefined') throw new Error('Browser tidak mendukung file .gz — gunakan file .json'); text = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); } else text = new TextDecoder().decode(buf);
         const obj = JSON.parse(text); if(!obj || obj.app!=='PERFORMANCE DASHBOARD' || !obj.data) throw new Error('Bukan file backup dashboard ini.');
         let n = 0; PERSIST_KEYS.forEach(k=>{ if(obj.data[k]!==undefined){ STATE[k] = obj.data[k]; n++; } });
-        st('Restore berhasil ('+n+' tabel data, backup '+fDate(String(obj.exportedAt).slice(0,10))+').'); rendered_reset();
+        window.__uploadNote = 'Restore dari backup tanggal '+fDate(String(obj.exportedAt).slice(0,10))+' ('+f.name+')';
+        st('Restore berhasil ('+n+' tabel data, backup '+fDate(String(obj.exportedAt).slice(0,10))+'). Menyimpan ke server…'); rendered_reset(); loadHist(8000);
       }catch(err){ st('Gagal restore: '+(err.message||err)); }
       e.target.value='';
     });
@@ -7319,6 +7464,20 @@ function updateSidebarFoot(){
   const foot = document.getElementById('sidebar-foot');
   const to = STATE.dataMeta && STATE.dataMeta.sales && STATE.dataMeta.sales.to;
   if(foot && latest.y) foot.textContent = to ? `Sales s/d ${fDate(to)} · Toko 80000` : `Data s/d ${MONTH_NAMES[latest.m-1]} ${latest.y} · Toko 80000`;
+  updateDataFresh(to);
+}
+// Penanda kesegaran data: tanggal sales terakhir + peringatan bila sudah lama tidak diperbarui (hijau ≤2 hari, kuning 3–6 hari, merah ≥7 hari)
+function updateDataFresh(to){
+  const el = document.getElementById('data-fresh'); if(!el) return;
+  const m = String(to||'').match(/^(\d{4})-(\d{2})-(\d{2})/); if(!m){ el.style.display = 'none'; return; }
+  const t0 = new Date(), today = Date.UTC(t0.getFullYear(), t0.getMonth(), t0.getDate()), last = Date.UTC(+m[1], +m[2]-1, +m[3]);
+  const age = Math.max(0, Math.round((today-last)/864e5));
+  const up = STATE.dataMeta && STATE.dataMeta.sales && STATE.dataMeta.sales.uploadedAt;
+  const when = age===0 ? 'hari ini' : age===1 ? 'kemarin' : age+' hari lalu';
+  el.className = 'data-fresh' + (age>=7 ? ' old' : age>=3 ? ' warn' : '');
+  el.textContent = 'Data sales s/d ' + fDate(to) + ' (' + when + ')' + (age>=3 ? ' — perlu diperbarui' : '');
+  el.title = 'Tanggal transaksi sales terakhir di dashboard' + (up ? '. Terakhir diunggah: ' + fDate(up) : '') + '. Budget pro-rata & LY apple-to-apple dihitung sampai tanggal ini.';
+  el.style.display = '';
 }
 (async function init(){
   let loaded = false;

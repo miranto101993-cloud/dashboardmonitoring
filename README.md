@@ -18,3 +18,14 @@ Login Sales dengan Master Brand "Private Brand" mendapat tab **Belting** (posisi
 
 ## Sales by Brand (Private Brand)
 Untuk Salesperson Private Brand, "Sales by Brand" = penjualan Private Brand + Exclusive Brand (Master Type Brand) milik salesperson itu sendiri, hanya pada kategori di dalam zonanya sendiri (data per salesperson per kategori: `spCatFact`).
+
+## Catatan pembaruan (Okt 2026)
+- **Riwayat Upload**: setiap penyimpanan data admin dicatat di server (siapa, kapan, keterangan, ukuran; 30 terakhir). Tampil di Upload Data → Backup, Restore & Keamanan. Restore dari backup kini ikut tersimpan ke server.
+- **Sales Saya (Supplier)**: kartu Sales by Brand menampilkan penjualan master brand milik salper sendiri (+ LY), bukan total toko.
+- **Data terakhir diperbarui**: label di bawah judul halaman — hijau (≤2 hari), kuning (3–6 hari), merah (≥7 hari sejak tanggal sales terakhir).
+
+## Izin Upload Data (Okt 2026)
+- Menu **Upload Data hanya tampil untuk admin utama**. Admin (Manager) lain tidak melihat menunya dan server menolak semua penyimpanan data dari mereka.
+- Admin utama bisa memberi izin lewat **Kelola Pengguna → Beri izin upload** pada user Manager: sistem membuat kode (atau Anda isi sendiri, min. 6 karakter) yang harus diberikan ke admin tersebut.
+- Admin yang diberi izin melihat menu Upload Data, tetapi harus memasukkan kode setiap sesi (berlaku 8 jam). **Cabut izin upload** / **Ganti kode** langsung mematikan akses yang sudah terbuka.
+- Riwayat Upload hanya terlihat oleh admin yang berwenang unggah.

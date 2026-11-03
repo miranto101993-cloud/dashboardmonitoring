@@ -59,9 +59,17 @@ async function who(req) {
   if (isOwner(o.u)) return { user: o.u, name: 'Admin', role: 'admin' };
   const db = await loadUsers(); const r = db.users[o.u];
   if (!r || r.disabled || (o.pv || 0) !== (r.pv || 0)) return null;
-  return { user: o.u, name: r.name || o.u, role: roleName(r.role, o.u), spId: r.spId || o.u };
+  return { user: o.u, name: r.name || o.u, role: roleName(r.role, o.u), spId: r.spId || o.u, upGrant: !!(r.upload && r.upload.on), upV: (r.upload && r.upload.v) || 0 };
 }
 
+// Izin unggah: admin utama selalu boleh. Admin lain hanya bila diberi izin oleh admin utama DAN sudah membuka dengan kode unggah (token 8 jam, otomatis mati bila izin dicabut / kode diganti).
+const uploadOk = (me, req) => {
+  if (!me || me.role !== 'admin') return false;
+  if (isOwner(me.user)) return true;
+  if (!me.upGrant) return false;
+  const o = verify(req.headers.get('x-upload-token') || '');
+  return !!(o && o.up === 1 && o.u === me.user && (o.uv || 0) === me.upV);
+};
 const here = dirname(fileURLToPath(import.meta.url));
 function dataFile(name) {
   const roots = [process.env.LAMBDA_TASK_ROOT, process.cwd(), join(here, '..', '..'), here].filter(Boolean);
@@ -266,11 +274,20 @@ export default async (req) => {
 
     if (path === 'session' && method === 'GET') {
       let rev = '0'; try { rev = (await store().get('rev')) || '0'; } catch {}
-      return json({ authRequired: true, role: me ? me.role : null, user: me ? me.user : null, canManage: !!me && me.user === OWNER_USER, spId: me ? me.spId || null : null, name: me ? me.name : null, adminEnabled: !!ADMIN_PASSWORD(), rev });
+      return json({ authRequired: true, canUpload: !!me && me.role === 'admin' && (isOwner(me.user) || !!me.upGrant), uploadOk: uploadOk(me, req), role: me ? me.role : null, user: me ? me.user : null, canManage: !!me && me.user === OWNER_USER, spId: me ? me.spId || null : null, name: me ? me.name : null, adminEnabled: !!ADMIN_PASSWORD(), rev });
     }
 
     if (!me) return json({ error: 'Perlu login.' }, 401);
     const role = me.role;
+
+    // admin non-utama: buka akses unggah dengan kode dari admin utama
+    if (path === 'upload-unlock' && method === 'POST') {
+      let b = {}; try { b = await req.json(); } catch {}
+      const r = (await loadUsers()).users[me.user];
+      if (role === 'admin' && r && r.upload && r.upload.on && checkPw(String(b.code || ''), r.upload)) return json({ ok: true, token: sign({ u: me.user, up: 1, uv: r.upload.v || 0, exp: Date.now() + 8 * 3600e3 }) });
+      await sleep(900);
+      return json({ ok: false, error: 'Kode unggah salah, atau Anda belum diberi izin unggah oleh admin utama.' }, 403);
+    }
 
     // ---------- akun Salesperson: hanya data milik sendiri ----------
     if (role === 'sales') {
@@ -289,6 +306,7 @@ export default async (req) => {
 
     if (path === 'lock') {
       if (role !== 'admin') return json({ error: 'Khusus admin.' }, 403);
+      if (!uploadOk(me, req)) return json({ ok: false, error: 'Anda tidak memiliki izin unggah. Hubungi admin utama.' }, 403);
       const lk = await getLock(); const rev = (await store().get('rev')) || '0';
       if (method === 'GET') return json({ rev, lock: lk ? { holder: lk.name, mine: lk.user === me.user, exp: lk.exp } : null });
       let b = {}; try { b = await req.json(); } catch {}
@@ -302,7 +320,7 @@ export default async (req) => {
     if (parts[0] === 'admin' && parts[1] === 'users') {
       if (me.user !== OWNER_USER) return json({ error: 'Kelola pengguna hanya untuk admin utama (' + OWNER_USER + ').' }, 403);
       const db = await loadUsers(); let target = ''; try { target = decodeURIComponent(parts[2] || '').toLowerCase(); } catch {}
-      const pub = () => ({ owner: OWNER_USER, users: Object.entries(db.users).map(([u, r]) => ({ username: u, name: r.name, role: roleName(r.role, u), spId: r.spId || (ID_RE.test(u) ? u : null), mb: r.mb || null, disabled: !!r.disabled, created: r.created })), pending: Object.entries(db.pending).map(([u, r]) => ({ username: u, name: r.name, kind: r.kind || (ID_RE.test(u) ? 'sales' : 'tl'), requestedAt: r.requestedAt })) });
+      const pub = () => ({ owner: OWNER_USER, users: Object.entries(db.users).map(([u, r]) => ({ username: u, name: r.name, role: roleName(r.role, u), spId: r.spId || (ID_RE.test(u) ? u : null), mb: r.mb || null, upload: !!(r.upload && r.upload.on), disabled: !!r.disabled, created: r.created })), pending: Object.entries(db.pending).map(([u, r]) => ({ username: u, name: r.name, kind: r.kind || (ID_RE.test(u) ? 'sales' : 'tl'), requestedAt: r.requestedAt })) });
       if (method === 'GET' && !target) return json(pub());
       let b = {}; if (method !== 'GET' && method !== 'DELETE') { try { b = await req.json(); } catch {} }
       const roleOk = (r) => (r === 'admin' ? 'admin' : 'viewer');
@@ -342,6 +360,16 @@ export default async (req) => {
         db.users[target] = { name: p.name, role: roleOk(b.role || (p.kind === 'manager' ? 'admin' : 'viewer')), kind: p.kind === 'manager' ? 'manager' : 'tl', salt: p.salt, hash: p.hash, pv: 1, created: new Date().toISOString() }; delete db.pending[target];
         await saveUsers(db); return json(pub());
       }
+      if (method === 'POST' && parts[3] === 'upload') { // izin unggah untuk admin lain (butuh kode dari admin utama)
+        const r = db.users[target]; if (!r) return json({ error: 'User tidak ditemukan.' }, 404);
+        if (roleName(r.role, target) !== 'admin') return json({ error: 'Izin unggah hanya untuk user berperan Admin (Manager).' }, 400);
+        const v = ((r.upload && r.upload.v) || 0) + 1;
+        if (b.enable) {
+          const code = String(b.code || '').trim() || rndPw(); if (code.length < 6) return json({ error: 'Kode unggah minimal 6 karakter.' }, 400);
+          r.upload = { on: true, v, ...newCred(code) }; await saveUsers(db); return json({ ...pub(), uploadCode: code, uploadFor: target });
+        }
+        r.upload = { on: false, v }; await saveUsers(db); return json(pub());
+      }
       if (method === 'POST' && parts[3] === 'reject') { delete db.pending[target]; await saveUsers(db); return json(pub()); }
       if (method === 'POST' && parts[3] === 'update') {
         const r = db.users[target]; if (!r) return json({ error: 'User tidak ditemukan.' }, 404);
@@ -357,6 +385,12 @@ export default async (req) => {
     }
 
     if (path === 'rev' && method === 'GET') return json({ rev: (await store().get('rev')) || '0' });
+
+    if (path === 'history' && method === 'GET') {
+      if (role !== 'admin' || !(isOwner(me.user) || me.upGrant)) return json({ error: 'Khusus admin yang berwenang unggah.' }, 403);
+      let h = []; try { h = JSON.parse((await store().get('history', { type: 'text' })) || '[]'); } catch {}
+      return json({ history: h });
+    }
 
     // data bawaan (dipecah ≤ 2,5 MB per bagian agar di bawah batas respons fungsi)
     if (parts[0] === 'data') {
@@ -383,6 +417,7 @@ export default async (req) => {
         return text(v, 200, { 'cache-control': url.searchParams.get('v') ? 'private, max-age=31536000, immutable' : 'no-store' });
       }
       if (role !== 'admin') return json({ error: 'Hanya admin yang boleh mengubah data.' }, 403);
+      if (!uploadOk(me, req)) return json({ error: 'Anda tidak memiliki izin unggah. Hubungi admin utama.' }, 403);
       const isMeta = /(^|[:_])meta$/.test(key);
       if (!(method === 'DELETE' && /^v[a-z0-9]+:chunk:\d+$/i.test(key))) { // pembersihan versi lama boleh tanpa kunci; selain itu wajib memegang kunci unggah
         const lk = await getLock();
@@ -394,7 +429,17 @@ export default async (req) => {
         const body = await req.text();
         if (body.length > 5.5 * 1024 * 1024) return json({ error: 'Data terlalu besar untuk satu bagian.' }, 413);
         await store().set('kv/' + key, body);
-        return json({ ok: true, ...(isMeta ? { rev: await touchRev() } : {}) });
+        if (isMeta) {
+          const rev = await touchRev();
+          try { // riwayat unggah: siapa, kapan, apa (30 catatan terakhir)
+            let h = []; try { h = JSON.parse((await store().get('history', { type: 'text' })) || '[]'); } catch {}
+            let note = ''; try { note = decodeURIComponent(req.headers.get('x-note') || ''); } catch {}
+            h.unshift({ t: Date.now(), user: me.user, name: me.name || me.user, rev, kb: Math.round(body.length / 1024), note: note.slice(0, 220) });
+            await store().set('history', JSON.stringify(h.slice(0, 30)));
+          } catch (e) { console.error('history', e); }
+          return json({ ok: true, rev });
+        }
+        return json({ ok: true });
       }
       if (method === 'DELETE') {
         await store().delete('kv/' + key);
